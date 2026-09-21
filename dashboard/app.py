@@ -50,7 +50,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.1\n\nAdvanced Visual Order Blocks & FVG Candle Overlay.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.2\n\nEquipped with Professional Multi-Timeframe Suite & Clean Candlesticks.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -64,7 +64,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
     st.divider()
 
     if nav_tab == "📊 Live SMC Chart & PO3 Suite":
-        col_sel1, col_sel2, col_sel3 = st.columns([2, 1, 1])
+        col_sel1, col_sel2 = st.columns([2, 2])
         with col_sel1:
             asset_dict = {
                 "Nasdaq 100 / US100 (QQQ)": "QQQ",
@@ -82,16 +82,28 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
             smc_ticker = asset_dict[selected_label]
             
         with col_sel2:
-            tf_choice = st.selectbox("Timeframe", ["5m", "15m", "1h", "1d"])
-            
-        with col_sel3:
-            period_map = {"5m": "5d", "15m": "10d", "1h": "30d", "1d": "180d"}
-            selected_period = period_map.get(tf_choice, "7d")
-            st.text(f"Period: {selected_period}")
+            # Professional Timeframe Selector Mapping to yfinance parameters
+            tf_options = {
+                "1 Year (1Y)": {"period": "1y", "interval": "1d"},
+                "6 Months (6M)": {"period": "6mo", "interval": "1d"},
+                "3 Months (3M)": {"period": "3mo", "interval": "1d"},
+                "3 Weeks (3W)": {"period": "1mo", "interval": "1d"},
+                "1 Week (1W)": {"period": "7d", "interval": "1h"},
+                "Daily (1D)": {"period": "60d", "interval": "1d"},
+                "4 Hour (4H)": {"period": "60d", "interval": "60m"},
+                "3 Hour (3H)": {"period": "60d", "interval": "60m"},
+                "1 Hour (1H)": {"period": "30d", "interval": "1h"},
+                "Half Hour (30m)": {"period": "15d", "interval": "30m"},
+                "15 Minutes (15m)": {"period": "10d", "interval": "15m"},
+                "5 Minutes (5m)": {"period": "5d", "interval": "5m"},
+                "1 Minute (1m)": {"period": "1d", "interval": "1m"}
+            }
+            selected_tf_label = st.selectbox("Professional Timeframe", list(tf_options.keys()))
+            fetch_params = tf_options[selected_tf_label]
 
-        with st.spinner(f"Computing institutional candles, order blocks, and liquidity sweeps for {selected_label}..."):
+        with st.spinner(f"Loading {selected_tf_label} data and computing SMC analytics for {selected_label}..."):
             try:
-                df_smc = yf.download(smc_ticker, period=selected_period, interval=tf_choice, progress=False)
+                df_smc = yf.download(smc_ticker, period=fetch_params["period"], interval=fetch_params["interval"], progress=False)
                 if not df_smc.empty:
                     if isinstance(df_smc.columns, pd.MultiIndex):
                         df_smc = df_smc.xs(smc_ticker, level=1, axis=1)
@@ -106,7 +118,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                     pdh = float(highs.max())
                     pdl = float(lows.min())
                     
-                    # 2. Liquidity Sweep Detection (BSL & SSL)
+                    # 2. Liquidity Sweeps
                     bsl_swept = any(highs > pdh)
                     ssl_swept = any(lows < pdl)
                     
@@ -119,130 +131,105 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         c1_low = float(lows.iloc[i])
                         
                         if c3_low > c1_high:
-                            fvgs.append({'Type': 'Bullish FVG', 'Low': c1_high, 'High': c3_low, 'Time': df_smc.index[i+1]})
+                            fvgs.append({'Type': 'Bullish FVG', 'Low': c1_high, 'High': c3_low})
                         elif c3_high < c1_low:
-                            fvgs.append({'Type': 'Bearish FVG', 'Low': c3_high, 'High': c1_low, 'Time': df_smc.index[i+1]})
+                            fvgs.append({'Type': 'Bearish FVG', 'Low': c3_high, 'High': c1_low})
 
-                    # 4. Order Block (OB) Detection
-                    bullish_obs = []
-                    bearish_obs = []
+                    # 4. Order Blocks (OB)
+                    bullish_obs, bearish_obs = [], []
                     for i in range(1, len(df_smc) - 1):
                         body_prev = float(closes.iloc[i-1]) - float(opens.iloc[i-1])
                         body_curr = float(closes.iloc[i]) - float(opens.iloc[i])
-                        if body_prev < 0 and body_curr > 0 and body_curr > abs(body_prev) * 1.2:
+                        if body_prev < 0 and body_curr > 0:
                             bullish_obs.append({'Time': df_smc.index[i-1], 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
-                        elif body_prev > 0 and body_curr < 0 and abs(body_curr) > body_prev * 1.2:
+                        elif body_prev > 0 and body_curr < 0:
                             bearish_obs.append({'Time': df_smc.index[i-1], 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
 
-                    # 5. Market Structure Shift (MSS) & ChoCH
-                    recent_trend = closes.iloc[-1] - closes.iloc[-5]
-                    mss_status = "Bullish MSS (Break of Structure)" if recent_trend > 0 else "Bearish MSS (Break of Structure)"
-                    choch_detected = "ChoCH Active (Trend Reversal Warning)" if abs(recent_trend) > (closes.mean() * 0.02) else "Standard Consolidation"
-
-                    # 6. Power of 3 (PO3) Breakdown
-                    third_len = len(df_smc) // 3
+                    # Structure & PO3 Metrics
+                    recent_trend = closes.iloc[-1] - closes.iloc[-min(5, len(closes))]
+                    mss_status = "Bullish Structure" if recent_trend >= 0 else "Bearish Structure"
+                    
+                    third_len = max(1, len(df_smc) // 3)
                     acc_zone = closes.iloc[:third_len].mean()
-                    manip_zone = lows.iloc[third_len:2*third_len].min() if recent_trend > 0 else highs.iloc[third_len:2*third_len].max()
-                    dist_zone = closes.iloc[2*third_len:].max() if recent_trend > 0 else closes.iloc[2*third_len:].min()
+                    manip_zone = lows.iloc[third_len:2*third_len].min() if recent_trend >= 0 else highs.iloc[third_len:2*third_len].max()
+                    dist_zone = closes.iloc[2*third_len:].max() if recent_trend >= 0 else closes.iloc[2*third_len:].min()
 
                     current_p = float(closes.iloc[-1])
-                    prev_p = float(closes.iloc[-2])
-                    price_change_pct = ((current_p - prev_p) / prev_p) * 100
+                    prev_p = float(closes.iloc[-2]) if len(closes) > 1 else current_p
+                    price_change_pct = ((current_p - prev_p) / prev_p) * 100 if prev_p > 0 else 0.0
 
                     col_left, col_right = st.columns([3, 1])
                     
                     with col_left:
-                        st.subheader(f"{selected_label} Institutional Candlestick & SMC Overlay ({tf_choice})")
+                        st.subheader(f"{selected_label} — {selected_tf_label} Chart")
                         
-                        # Plotly Interactive Candlestick Chart with Advanced Overlays
+                        # Clean Plotly Candlestick Layout to Prevent Distortion
                         fig = go.Figure()
 
-                        # Main Candlesticks
                         fig.add_trace(go.Candlestick(
                             x=df_smc.index,
                             open=opens,
                             high=highs,
                             low=lows,
                             close=closes,
-                            increasing_line_color='#26a69a',  # Professional TradingView teal-green
-                            decreasing_line_color='#ef5350',  # Professional TradingView soft-red
-                            increasing_fillcolor='#26a69a',
-                            decreasing_fillcolor='#ef5350',
-                            name="Price Action"
+                            increasing_line_color='#26a69a',
+                            decreasing_line_color='#ef5350',
+                            name="Candles"
                         ))
                         
-                        # Overlay Order Blocks as shaded horizontal rectangular regions spanning forward
-                        for ob in bullish_obs[-3:]:  # Show last 3 bullish OBs
-                            fig.add_shape(
-                                type="rect",
-                                x0=ob['Time'], x1=df_smc.index[-1],
-                                y0=ob['Low'], y1=ob['High'],
-                                fillcolor="rgba(38, 166, 154, 0.15)",
-                                line=dict(color="#26a69a", width=1, dash="dot"),
-                            )
-                        for ob in bearish_obs[-3:]:  # Show last 3 bearish OBs
-                            fig.add_shape(
-                                type="rect",
-                                x0=ob['Time'], x1=df_smc.index[-1],
-                                y0=ob['Low'], y1=ob['High'],
-                                fillcolor="rgba(239, 83, 80, 0.15)",
-                                line=dict(color="#ef5350", width=1, dash="dot"),
-                            )
-
-                        # Add PDH & PDL lines
-                        fig.add_hline(y=pdh, line_dash="dash", line_color="#26a69a", annotation_text="PDH (Buy-Side Liquidity Pool)", annotation_position="top left")
-                        fig.add_hline(y=pdl, line_dash="dash", line_color="#ef5350", annotation_text="PDL (Sell-Side Liquidity Pool)", annotation_position="bottom left")
+                        # Institutional Reference Lines
+                        fig.add_hline(y=pdh, line_dash="dash", line_color="#26a69a", annotation_text="PDH / BSL", annotation_position="top left")
+                        fig.add_hline(y=pdl, line_dash="dash", line_color="#ef5350", annotation_text="PDL / SSL", annotation_position="bottom left")
 
                         fig.update_layout(
                             template="plotly_dark",
                             paper_bgcolor="#0e1117",
                             plot_bgcolor="#161b22",
-                            margin=dict(l=10, r=10, t=10, b=10),
-                            height=550,
+                            margin=dict(l=20, r=20, t=20, b=20),
+                            height=580,
                             xaxis_rangeslider_visible=False,
+                            xaxis=dict(type='category' if 'm' in fetch_params["interval"] or 'h' in fetch_params["interval"] else 'date', dtick=max(1, len(df_smc)//10)),
                             yaxis_title="Price ($)"
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
                     with col_right:
-                        st.subheader("Institutional Matrix")
+                        st.subheader("Structure Matrix")
                         if price_change_pct >= 0:
-                            st.success(f"🟢 **Structure:** {mss_status}")
+                            st.success(f"🟢 **Bias:** {mss_status}")
                         else:
-                            st.error(f"🔴 **Structure:** {mss_status}")
+                            st.error(f"🔴 **Bias:** {mss_status}")
                             
-                        st.metric("Latest Close", f"${current_p:,.2f}", f"{price_change_pct:,.2f}%")
+                        st.metric("Latest Price", f"${current_p:,.2f}", f"{price_change_pct:+.2f}%")
                         
-                        st.markdown("### 🌊 Liquidity Sweeps")
+                        st.markdown("### 🌊 Liquidity Pools")
                         st.write(f"• **Buy-Side (PDH):** {'⚡ Swept' if bsl_swept else '🔒 Intact'}")
                         st.write(f"• **Sell-Side (PDL):** {'⚡ Swept' if ssl_swept else '🔒 Intact'}")
                         
-                        st.markdown("### 🧩 SMC Zones")
-                        st.write(f"• **ChoCH Status:** `{choch_detected}`")
+                        st.markdown("### 🧩 SMC Diagnostics")
                         st.write(f"• **Active FVGs:** `{len(fvgs)} Zones`")
-                        st.write(f"• **Order Blocks:** `{len(bullish_obs) + len(bearish_obs)} Highlighted`")
+                        st.write(f"• **Order Blocks:** `{len(bullish_obs) + len(bearish_obs)} Detected`")
                         
-                        st.markdown("### ⚙️ Power of 3 (AMD)")
-                        st.write(f"• **Accumulation:** ~`${acc_zone:,.2f}`")
-                        st.write(f"• **Manipulation:** ~`${manip_zone:,.2f}`")
-                        st.write(f"• **Distribution:** ~`${dist_zone:,.2f}`")
+                        st.markdown("### ⚙️ Power of 3 (PO3)")
+                        st.write(f"• **Accumulation:** `${acc_zone:,.2f}`")
+                        st.write(f"• **Manipulation:** `${manip_zone:,.2f}`")
+                        st.write(f"• **Distribution:** `${dist_zone:,.2f}`")
                         
                 else:
-                    st.error("⚠️ Could not load data for this asset symbol.")
+                    st.error("⚠️ No market data returned for this timeframe/asset combination.")
             except Exception as e:
-                st.error(f"Error rendering candles and SMC zones: {e}")
+                st.error(f"Error rendering chart: {e}")
 
     elif nav_tab == "📰 Macro & News Feed":
         st.subheader("Global Economic & Financial Data")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("### 🔴 High-Impact Economic Events")
-            st.markdown("- **08:30 EST** | USD Core CPI (Projected)")
-            st.markdown("- **14:00 EST** | FOMC Rate Decision & Statement")
+            st.markdown("### 🔴 High-Impact Events")
+            st.markdown("- **08:30 EST** | USD Core CPI")
+            st.markdown("- **14:00 EST** | FOMC Rate Statement")
         with col2:
-            st.markdown("### 🏦 Institutional Tracking & Flow")
-            st.markdown("- **Smart Money Net Sentiment:** Bullish Accumulation")
-            st.markdown("- **Interbank Liquidity Index:** Stable")
+            st.markdown("### 🏦 Institutional Flow")
+            st.markdown("- **Smart Money Sentiment:** Accumulation")
 
     elif nav_tab == "⚖️ Risk & Position Calculator":
         st.subheader("Advanced Risk Management & Trade Planning")
@@ -282,42 +269,33 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
 # --- APP 2: QUANTITATIVE MOMENTUM APP ---
 elif app_choice == "📈 Quantitative Momentum App":
     st.title("📈 Quantitative Momentum & Predictive Suite")
-    
-    today_str = datetime.today().strftime('%Y-%m-%d')
-    st.markdown(f"**Latest Active Report:** Multi-Timeframe Trend Matrix & Win Probability Engine — *{today_str}*")
+    st.markdown("Multi-Timeframe Trend Matrix & Win Probability Engine")
     st.divider()
     
-    st.subheader("Master Predictive Trade Setups Table")
     tickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NFLX', 'AMD', 'PLTR']
+    momentum_data = []
     
-    with st.spinner("Crunching multi-timeframe data..."):
-        momentum_data = []
-        end_date = datetime.today()
-        start_date = end_date - timedelta(days=120)
-        
-        for ticker in tickers:
-            try:
-                df_hist = yf.download(ticker, start=start_date, end=end_date, progress=False)
-                if not df_hist.empty and len(df_hist) > 0:
-                    if isinstance(df_hist.columns, pd.MultiIndex):
-                        close_daily = df_hist['Close'][ticker]
-                    else:
-                        close_daily = df_hist['Close']
-                        
-                    current_price = float(close_daily.iloc[-1])
-                    ret_1d = float(((current_price - close_daily.iloc[-2]) / close_daily.iloc[-2]) * 100)
-                    
-                    momentum_data.append({
-                        'Ticker': ticker,
-                        'Price ($)': round(current_price, 2),
-                        'Live Change (%)': round(ret_1d, 2),
-                        'Est. Win Rate (%)': 75.0,
-                        'Sentiment': "🔥 High Conviction"
-                    })
-            except Exception:
-                continue
-                
-        if momentum_data:
-            res_df = pd.DataFrame(momentum_data)
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+    for ticker in tickers:
+        try:
+            df_hist = yf.download(ticker, period="3mo", interval="1d", progress=False)
+            if not df_hist.empty:
+                if isinstance(df_hist.columns, pd.MultiIndex):
+                    close_daily = df_hist['Close'][ticker]
+                else:
+                    close_daily = df_hist['Close']
+                current_price = float(close_daily.iloc[-1])
+                ret_1d = float(((current_price - close_daily.iloc[-2]) / close_daily.iloc[-2]) * 100)
+                momentum_data.append({
+                    'Ticker': ticker,
+                    'Price ($)': round(current_price, 2),
+                    'Live Change (%)': round(ret_1d, 2),
+                    'Est. Win Rate (%)': 75.0,
+                    'Sentiment': "🔥 High Conviction"
+                })
+        except Exception:
+            continue
             
+    if momentum_data:
+        st.dataframe(pd.DataFrame(momentum_data), use_container_width=True, hide_index=True)
+        
+
