@@ -124,7 +124,6 @@ elif app_choice == "📈 Quantitative Momentum App":
     st.title("📈 Quantitative Momentum Investing App")
     st.markdown("Precision institutional momentum ranking across 15 premier market leaders.")
     
-    # Curated list of 15 high-liquidity market leaders
     tickers = [
         'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 
         'META', 'TSLA', 'NFLX', 'AMD', 'PLTR', 
@@ -148,7 +147,7 @@ elif app_choice == "📈 Quantitative Momentum App":
                         close_prices = df_hist['Close']
                     
                     start_price = close_prices.iloc[0]
-                    recent_start_price = close_prices.iloc[-30]  # ~1 month ago
+                    recent_start_price = close_prices.iloc[-30]
                     current_price = close_prices.iloc[-1]
                     
                     ret_12m = ((current_price - start_price) / start_price) * 100
@@ -168,7 +167,7 @@ elif app_choice == "📈 Quantitative Momentum App":
         if momentum_data:
             res_df = pd.DataFrame(momentum_data)
             res_df = res_df.sort_values(by='Momentum Score', ascending=False).reset_index(drop=True)
-            res_df.index = res_df.index + 1  # Start ranking from 1 to 15
+            res_df.index = res_df.index + 1
             
             st.success("✅ Quantitative Rankings Loaded Successfully!")
             st.dataframe(res_df, use_container_width=True)
@@ -177,3 +176,4 @@ elif app_choice == "📈 Quantitative Momentum App":
             st.bar_chart(res_df.set_index('Ticker')['Momentum Score'])
         else:
             st.error("⚠️ Unable to fetch live data right now. Please check your network connection.")
+            
