@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import yfinance as yf
+from datetime import datetime, timedelta
 
 # Page Configuration for Professional Terminal
 st.set_page_config(
@@ -17,7 +19,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("Easily switch between your institutional trading workspace and your quantitative investment dashboard.")
+st.sidebar.info("Seamlessly switch between your institutional SMC trading desk and your quantitative equity screener.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -120,13 +122,69 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
 # --- APP 2: QUANTITATIVE MOMENTUM APP ---
 elif app_choice == "📈 Quantitative Momentum App":
     st.title("📈 Quantitative Momentum Investing App")
-    st.markdown("Your original stock momentum screening app lives here!")
-    st.info("If you have your original momentum code blocks from before, you can paste them right here under this section.")
+    st.markdown("Live multi-factor momentum screening across key institutional watchlists.")
     
-    # Placeholder table for your momentum app
-    momentum_data = pd.DataFrame({
-        'Ticker': ['AAPL', 'MSFT', 'NVDA', 'GOOGL'],
-        'Momentum Score': [89.5, 92.1, 98.4, 85.0],
-        'Status': ['Active Screen', 'Active Screen', 'Top Performer', 'Watchlist']
-    })
-    st.dataframe(momentum_data, use_container_width=True)
+    # Asset Universe Selection
+    universe_dict = {
+        "Mega-Cap Tech": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "NFLX"],
+        "Financial & Energy": ["JPM", "BAC", "XOM", "CVX", "GS", "MS"],
+        "Crypto Proxies & Growth": ["COIN", "MSTR", "PLTR", "ARM", "SHOP", "SQ"]
+    }
+    
+    selected_universe = st.selectbox("Select Asset Universe", list(universe_dict.keys()))
+    tickers = universe_dict[selected_universe]
+    
+    top_n = st.slider("Number of Top Momentum Picks to Display", min_value=3, max_value=len(tickers), value=5)
+    
+    if st.button("Run Live Momentum Calculation", type="primary"):
+        with st.spinner("Fetching live historical price data and computing momentum scores..."):
+            momentum_data = []
+            
+            # Fetch 1 year of data to calculate trailing returns
+            end_date = datetime.today()
+            start_date = end_date - timedelta(days=365)
+            
+            for ticker in tickers:
+                try:
+                    df_hist = yf.download(ticker, start=start_date, end=end_date, progress=False)
+                    if not df_hist.empty and len(df_hist) > 30:
+                        # Handle multi-index columns if returned by newer yfinance versions
+                        if isinstance(df_hist.columns, pd.MultiIndex):
+                            close_prices = df_hist['Close'][ticker]
+                        else:
+                            close_prices = df_hist['Close']
+                        
+                        start_price = close_prices.iloc[0]
+                        recent_start_price = close_prices.iloc[-30]  # approx 1 month ago
+                        current_price = close_prices.iloc[-1]
+                        
+                        # Quantitative Momentum formula: 12M return minus last 1M return (or standard 12-1 momentum)
+                        ret_12m = ((current_price - start_price) / start_price) * 100
+                        ret_1m = ((current_price - recent_start_price) / recent_start_price) * 100
+                        mom_score = ret_12m - ret_1m
+                        
+                        momentum_data.append({
+                            'Ticker': ticker,
+                            'Current Price ($)': round(float(current_price), 2),
+                            '12M Return (%)': round(float(ret_12m), 2),
+                            '1M Return (%)': round(float(ret_1m), 2),
+                            'Momentum Score': round(float(mom_score), 2)
+                        })
+                except Exception as e:
+                    continue
+            
+            if momentum_data:
+                res_df = pd.DataFrame(momentum_data)
+                res_df = res_df.sort_values(by='Momentum Score', ascending=False).reset_index(drop=True)
+                top_picks = res_df.head(top_n)
+                
+                st.success("✅ Momentum ranking calculated successfully using live market data!")
+                st.subheader(f"🏆 Top {top_n} Momentum Rankings ({selected_universe})")
+                st.dataframe(top_picks, use_container_width=True)
+                
+                st.markdown("### Momentum Score Visualization")
+                st.bar_chart(top_picks.set_index('Ticker')['Momentum Score'])
+            else:
+                st.error("⚠️ Could not retrieve live data for this universe right now. Please try again.")
+    else:
+        st.info("💡 Click the **Run Live Momentum Calculation** button above to fetch live data and rank your assets.")
