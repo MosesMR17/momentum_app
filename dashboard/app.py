@@ -49,12 +49,12 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v3.8\n\nEquipped with SMC Structure Mapping & Quantitative Momentum.")
+st.sidebar.info("⚡ Live Institutional Terminal v4.0\n\nEquipped with Day Trading FVG Scanner & Multi-Timeframe Matrix.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
     st.title("🧊 SMC Ice Trading Terminal")
-    st.markdown("Institutional Price Action, Smart Money Concepts (SMC), and Liquidity Mapping Engine")
+    st.markdown("Institutional Price Action, Smart Money Concepts (SMC), and Intraday Execution Engine")
 
     nav_tab = st.selectbox(
         "Terminal Workspace",
@@ -63,17 +63,34 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
     st.divider()
 
     if nav_tab == "📊 Live Chart & FVG Scanner":
-        # Asset selector for live SMC analysis
+        # Asset selector with institutional day trading instruments
         col_sel1, col_sel2 = st.columns([2, 2])
         with col_sel1:
-            smc_ticker = st.selectbox("Select Terminal Asset", ["SPY", "QQQ", "BTC-USD", "EURUSD=X", "GC=F", "NVDA", "AAPL"])
+            asset_dict = {
+                "Nasdaq 100 / US100 (QQQ)": "QQQ",
+                "S&P 500 / S&P500 (SPY)": "SPY",
+                "Gold Futures (GC=F)": "GC=F",
+                "Crude Oil Futures (CL=F)": "CL=F",
+                "Euro / US Dollar (EURUSD=X)": "EURUSD=X",
+                "British Pound / USD (GBPUSD=X)": "GBPUSD=X",
+                "USD / Japanese Yen (USDJPY=X)": "USDJPY=X",
+                "Bitcoin (BTC-USD)": "BTC-USD",
+                "Ethereum (ETH-USD)": "ETH-USD",
+                "NVIDIA (NVDA)": "NVDA",
+                "Tesla (TSLA)": "TSLA",
+                "AMD (AMD)": "AMD",
+                "Palantir (PLTR)": "PLTR",
+                "Apple (AAPL)": "AAPL"
+            }
+            selected_label = st.selectbox("Select Day Trading Asset", list(asset_dict.keys()))
+            smc_ticker = asset_dict[selected_label]
         with col_sel2:
-            timeframe_choice = st.selectbox("Analysis Timeframe", ["Daily (Swing)", "1H (Intraday Execution)"])
+            timeframe_choice = st.selectbox("Analysis Timeframe", ["1H (Intraday Execution)", "Daily (Swing Structure)"])
 
-        with st.spinner(f"Scanning {smc_ticker} for institutional order blocks and imbalances..."):
+        with st.spinner(f"Scanning {selected_label} for institutional order blocks and imbalances..."):
             try:
-                period_val = "60d" if timeframe_choice == "Daily (Swing)" else "5d"
-                interval_val = "1d" if timeframe_choice == "Daily (Swing)" else "1h"
+                period_val = "7d" if timeframe_choice == "1H (Intraday Execution)" else "90d"
+                interval_val = "1h" if timeframe_choice == "1H (Intraday Execution)" else "1d"
                 
                 df_smc = yf.download(smc_ticker, period=period_val, interval=interval_val, progress=False)
                 if not df_smc.empty:
@@ -92,10 +109,8 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         c3_high = float(highs.iloc[i+2])
                         c1_low = float(lows.iloc[i])
                         
-                        # Bullish FVG: Gap between Candle 1 High and Candle 3 Low
                         if c3_low > c1_high:
                             fvgs.append({'Type': 'Bullish FVG', 'Zone Low': c1_high, 'Zone High': c3_low, 'Index': i+1})
-                        # Bearish FVG: Gap between Candle 1 Low and Candle 3 High
                         elif c3_high < c1_low:
                             fvgs.append({'Type': 'Bearish FVG', 'Zone Low': c3_high, 'Zone High': c1_low, 'Index': i+1})
 
@@ -105,7 +120,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
 
                     col_left, col_right = st.columns([3, 1])
                     with col_left:
-                        st.subheader(f"{smc_ticker} Price Action Structure")
+                        st.subheader(f"{selected_label} Price Action Structure")
                         chart_data = pd.DataFrame({'Close': closes, 'High': highs, 'Low': lows})
                         st.line_chart(chart_data)
                         
