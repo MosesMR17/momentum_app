@@ -50,7 +50,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.0\n\nEquipped with Advanced SMC, PO3 Engine & Liquidity Mapping.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.1\n\nAdvanced Visual Order Blocks & FVG Candle Overlay.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -89,7 +89,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
             selected_period = period_map.get(tf_choice, "7d")
             st.text(f"Period: {selected_period}")
 
-        with st.spinner(f"Computing institutional SMC metrics, PO3 zones, and liquidity sweeps for {selected_label}..."):
+        with st.spinner(f"Computing institutional candles, order blocks, and liquidity sweeps for {selected_label}..."):
             try:
                 df_smc = yf.download(smc_ticker, period=selected_period, interval=tf_choice, progress=False)
                 if not df_smc.empty:
@@ -107,7 +107,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                     pdl = float(lows.min())
                     
                     # 2. Liquidity Sweep Detection (BSL & SSL)
-                    # BSL: Price spikes above PDH then reverses down. SSL: Price dips below PDL then reverses up.
                     bsl_swept = any(highs > pdh)
                     ssl_swept = any(lows < pdl)
                     
@@ -120,29 +119,27 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         c1_low = float(lows.iloc[i])
                         
                         if c3_low > c1_high:
-                            fvgs.append({'Type': 'Bullish FVG', 'Low': c1_high, 'High': c3_low, 'Index': i+1})
+                            fvgs.append({'Type': 'Bullish FVG', 'Low': c1_high, 'High': c3_low, 'Time': df_smc.index[i+1]})
                         elif c3_high < c1_low:
-                            fvgs.append({'Type': 'Bearish FVG', 'Low': c3_high, 'High': c1_low, 'Index': i+1})
+                            fvgs.append({'Type': 'Bearish FVG', 'Low': c3_high, 'High': c1_low, 'Time': df_smc.index[i+1]})
 
                     # 4. Order Block (OB) Detection
-                    # Bullish OB: Last down candle before a strong impulsive push up
-                    # Bearish OB: Last up candle before a strong impulsive push down
                     bullish_obs = []
                     bearish_obs = []
                     for i in range(1, len(df_smc) - 1):
                         body_prev = float(closes.iloc[i-1]) - float(opens.iloc[i-1])
                         body_curr = float(closes.iloc[i]) - float(opens.iloc[i])
                         if body_prev < 0 and body_curr > 0 and body_curr > abs(body_prev) * 1.2:
-                            bullish_obs.append({'Index': i-1, 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
+                            bullish_obs.append({'Time': df_smc.index[i-1], 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
                         elif body_prev > 0 and body_curr < 0 and abs(body_curr) > body_prev * 1.2:
-                            bearish_obs.append({'Index': i-1, 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
+                            bearish_obs.append({'Time': df_smc.index[i-1], 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
 
-                    # 5. Market Structure Shift (MSS) & Change of Character (ChoCH)
+                    # 5. Market Structure Shift (MSS) & ChoCH
                     recent_trend = closes.iloc[-1] - closes.iloc[-5]
                     mss_status = "Bullish MSS (Break of Structure)" if recent_trend > 0 else "Bearish MSS (Break of Structure)"
                     choch_detected = "ChoCH Active (Trend Reversal Warning)" if abs(recent_trend) > (closes.mean() * 0.02) else "Standard Consolidation"
 
-                    # 6. Power of 3 (PO3): Accumulation, Manipulation, Distribution Breakdown
+                    # 6. Power of 3 (PO3) Breakdown
                     third_len = len(df_smc) // 3
                     acc_zone = closes.iloc[:third_len].mean()
                     manip_zone = lows.iloc[third_len:2*third_len].min() if recent_trend > 0 else highs.iloc[third_len:2*third_len].max()
@@ -155,30 +152,53 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                     col_left, col_right = st.columns([3, 1])
                     
                     with col_left:
-                        st.subheader(f"{selected_label} Advanced SMC & PO3 Mapping ({tf_choice})")
+                        st.subheader(f"{selected_label} Institutional Candlestick & SMC Overlay ({tf_choice})")
                         
-                        # Plotly Interactive Candlestick Chart
-                        fig = go.Figure(data=[go.Candlestick(
+                        # Plotly Interactive Candlestick Chart with Advanced Overlays
+                        fig = go.Figure()
+
+                        # Main Candlesticks
+                        fig.add_trace(go.Candlestick(
                             x=df_smc.index,
                             open=opens,
                             high=highs,
                             low=lows,
                             close=closes,
-                            increasing_line_color='#3fb950',
-                            decreasing_line_color='#f85149',
-                            name="OHLC"
-                        )])
+                            increasing_line_color='#26a69a',  # Professional TradingView teal-green
+                            decreasing_line_color='#ef5350',  # Professional TradingView soft-red
+                            increasing_fillcolor='#26a69a',
+                            decreasing_fillcolor='#ef5350',
+                            name="Price Action"
+                        ))
                         
-                        # Add PDH & PDL lines to chart
-                        fig.add_hline(y=pdh, line_dash="dash", line_color="#3fb950", annotation_text="PDH (Buy-Side Liquidity)", annotation_position="top left")
-                        fig.add_hline(y=pdl, line_dash="dash", line_color="#f85149", annotation_text="PDL (Sell-Side Liquidity)", annotation_position="bottom left")
+                        # Overlay Order Blocks as shaded horizontal rectangular regions spanning forward
+                        for ob in bullish_obs[-3:]:  # Show last 3 bullish OBs
+                            fig.add_shape(
+                                type="rect",
+                                x0=ob['Time'], x1=df_smc.index[-1],
+                                y0=ob['Low'], y1=ob['High'],
+                                fillcolor="rgba(38, 166, 154, 0.15)",
+                                line=dict(color="#26a69a", width=1, dash="dot"),
+                            )
+                        for ob in bearish_obs[-3:]:  # Show last 3 bearish OBs
+                            fig.add_shape(
+                                type="rect",
+                                x0=ob['Time'], x1=df_smc.index[-1],
+                                y0=ob['Low'], y1=ob['High'],
+                                fillcolor="rgba(239, 83, 80, 0.15)",
+                                line=dict(color="#ef5350", width=1, dash="dot"),
+                            )
+
+                        # Add PDH & PDL lines
+                        fig.add_hline(y=pdh, line_dash="dash", line_color="#26a69a", annotation_text="PDH (Buy-Side Liquidity Pool)", annotation_position="top left")
+                        fig.add_hline(y=pdl, line_dash="dash", line_color="#ef5350", annotation_text="PDL (Sell-Side Liquidity Pool)", annotation_position="bottom left")
 
                         fig.update_layout(
                             template="plotly_dark",
                             paper_bgcolor="#0e1117",
                             plot_bgcolor="#161b22",
                             margin=dict(l=10, r=10, t=10, b=10),
-                            height=520,
+                            height=550,
                             xaxis_rangeslider_visible=False,
                             yaxis_title="Price ($)"
                         )
@@ -197,20 +217,20 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         st.write(f"• **Buy-Side (PDH):** {'⚡ Swept' if bsl_swept else '🔒 Intact'}")
                         st.write(f"• **Sell-Side (PDL):** {'⚡ Swept' if ssl_swept else '🔒 Intact'}")
                         
-                        st.markdown("### 🧩 SMC Core Zones")
+                        st.markdown("### 🧩 SMC Zones")
                         st.write(f"• **ChoCH Status:** `{choch_detected}`")
-                        st.write(f"• **Active FVGs:** `{len(fvgs)} Zones Found`")
-                        st.write(f"• **Order Blocks:** `{len(bullish_obs) + len(bearish_obs)} OBs Identified`")
+                        st.write(f"• **Active FVGs:** `{len(fvgs)} Zones`")
+                        st.write(f"• **Order Blocks:** `{len(bullish_obs) + len(bearish_obs)} Highlighted`")
                         
                         st.markdown("### ⚙️ Power of 3 (AMD)")
                         st.write(f"• **Accumulation:** ~`${acc_zone:,.2f}`")
                         st.write(f"• **Manipulation:** ~`${manip_zone:,.2f}`")
-                        st.write(f"• **Distribution Target:** ~`${dist_zone:,.2f}`")
+                        st.write(f"• **Distribution:** ~`${dist_zone:,.2f}`")
                         
                 else:
                     st.error("⚠️ Could not load data for this asset symbol.")
             except Exception as e:
-                st.error(f"Error computing SMC analysis: {e}")
+                st.error(f"Error rendering candles and SMC zones: {e}")
 
     elif nav_tab == "📰 Macro & News Feed":
         st.subheader("Global Economic & Financial Data")
@@ -278,7 +298,7 @@ elif app_choice == "📈 Quantitative Momentum App":
         for ticker in tickers:
             try:
                 df_hist = yf.download(ticker, start=start_date, end=end_date, progress=False)
-                if not df_hist.empty and len(df_hist) > 50:
+                if not df_hist.empty and len(df_hist) > 0:
                     if isinstance(df_hist.columns, pd.MultiIndex):
                         close_daily = df_hist['Close'][ticker]
                     else:
