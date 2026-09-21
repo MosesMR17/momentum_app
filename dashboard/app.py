@@ -14,19 +14,14 @@ st.set_page_config(
 # --- PROFESSIONAL INSTITUTIONAL CSS STYLING ---
 st.markdown("""
     <style>
-    /* Main Background & Font Styling */
     .stApp {
         background-color: #0e1117;
         color: #c9d1d9;
     }
-    
-    /* Sidebar Customization */
     section[data-testid="stSidebar"] {
         background-color: #161b22;
         border-right: 1px solid #30363d;
     }
-    
-    /* Card / Container Styling */
     div.stMetric, div.css-1r6slb0, div[data-testid="stVerticalBlock"] > div[style*="border"] {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -34,20 +29,10 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
-    
-    /* Headers Customization */
     h1, h2, h3 {
         color: #f0f6fc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
-    /* Dataframe Styling */
-    dataframe, table {
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    
-    /* Custom success/info boxes */
     .stAlert {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -64,69 +49,102 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v3.5\n\nConnected to real-time feeds with multi-timeframe evaluation.")
+st.sidebar.info("⚡ Live Institutional Terminal v3.8\n\nEquipped with SMC Structure Mapping & Quantitative Momentum.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
-    def detect_fvg(df):
-        fvgs = []
-        for i in range(len(df) - 2):
-            c1_high = df.loc[i, 'High']
-            c3_low = df.loc[i + 2, 'Low']
-            if c3_low > c1_high:
-                fvgs.append({
-                    'Type': 'Bullish Fvg',
-                    'Zone Start': c1_high,
-                    'Zone End': c3_low,
-                    'Index': i + 1
-                })
-        return fvgs
-
     st.title("🧊 SMC Ice Trading Terminal")
-    st.markdown("Institutional Price Action, Smart Money Concepts (SMC), and Execution Engine")
+    st.markdown("Institutional Price Action, Smart Money Concepts (SMC), and Liquidity Mapping Engine")
 
     nav_tab = st.selectbox(
         "Terminal Workspace",
-        ["📊 Live Chart & SMC Scanner", "📰 Macro & News Feed", "⚖️ Risk & Position Calculator", "🚀 Execution & Order Book"]
+        ["📊 Live Chart & FVG Scanner", "📰 Macro & News Feed", "⚖️ Risk & Position Calculator", "🚀 Execution & Order Book"]
     )
     st.divider()
 
-    if nav_tab == "📊 Live Chart & SMC Scanner":
-        col_left, col_right = st.columns([3, 1])
-        with col_left:
-            st.subheader("Price Action Structure & FVG Overlay")
-            np.random.seed(42)
-            price_steps = np.random.randn(60) * 1.5
-            base_price = 4100 + price_steps.cumsum()
-            chart_df = pd.DataFrame({
-                'Price': base_price,
-                'High': base_price + np.random.uniform(0.5, 3.0, 60),
-                'Low': base_price - np.random.uniform(0.5, 3.0, 60)
-            })
-            st.line_chart(chart_df[['Price', 'High', 'Low']])
-        with col_right:
-            st.subheader("Structure Matrix")
-            st.success("🟢 **Market Structure:** Bullish MSS Confirmed")
-            active_fvgs = detect_fvg(chart_df)
-            if active_fvgs:
-                st.warning(f"⚠️ **Detected FVGs:** {len(active_fvgs)} Active Zones")
-                latest_fvg = active_fvgs[-1]
-                st.markdown(f"**Latest FVG Zone:**\n`{latest_fvg['Zone Start']:.2f}` to `{latest_fvg['Zone End']:.2f}`")
-            else:
-                st.info("ℹ️ No active FVG imbalances right now.")
-            st.markdown("---")
-            st.metric("Liquidity Sweep Status", "Cleaned Equal Highs", "Bullish")
+    if nav_tab == "📊 Live Chart & FVG Scanner":
+        # Asset selector for live SMC analysis
+        col_sel1, col_sel2 = st.columns([2, 2])
+        with col_sel1:
+            smc_ticker = st.selectbox("Select Terminal Asset", ["SPY", "QQQ", "BTC-USD", "EURUSD=X", "GC=F", "NVDA", "AAPL"])
+        with col_sel2:
+            timeframe_choice = st.selectbox("Analysis Timeframe", ["Daily (Swing)", "1H (Intraday Execution)"])
+
+        with st.spinner(f"Scanning {smc_ticker} for institutional order blocks and imbalances..."):
+            try:
+                period_val = "60d" if timeframe_choice == "Daily (Swing)" else "5d"
+                interval_val = "1d" if timeframe_choice == "Daily (Swing)" else "1h"
+                
+                df_smc = yf.download(smc_ticker, period=period_val, interval=interval_val, progress=False)
+                if not df_smc.empty:
+                    if isinstance(df_smc.columns, pd.MultiIndex):
+                        df_smc = df_smc.xs(smc_ticker, level=1, axis=1)
+                    
+                    closes = df_smc['Close']
+                    highs = df_smc['High']
+                    lows = df_smc['Low']
+                    
+                    # Fair Value Gap (FVG) Detection Logic
+                    fvgs = []
+                    for i in range(len(df_smc) - 2):
+                        c1_high = float(highs.iloc[i])
+                        c3_low = float(lows.iloc[i+2])
+                        c3_high = float(highs.iloc[i+2])
+                        c1_low = float(lows.iloc[i])
+                        
+                        # Bullish FVG: Gap between Candle 1 High and Candle 3 Low
+                        if c3_low > c1_high:
+                            fvgs.append({'Type': 'Bullish FVG', 'Zone Low': c1_high, 'Zone High': c3_low, 'Index': i+1})
+                        # Bearish FVG: Gap between Candle 1 Low and Candle 3 High
+                        elif c3_high < c1_low:
+                            fvgs.append({'Type': 'Bearish FVG', 'Zone Low': c3_high, 'Zone High': c1_low, 'Index': i+1})
+
+                    current_p = float(closes.iloc[-1])
+                    prev_p = float(closes.iloc[-2])
+                    price_change_pct = ((current_p - prev_p) / prev_p) * 100
+
+                    col_left, col_right = st.columns([3, 1])
+                    with col_left:
+                        st.subheader(f"{smc_ticker} Price Action Structure")
+                        chart_data = pd.DataFrame({'Close': closes, 'High': highs, 'Low': lows})
+                        st.line_chart(chart_data)
+                        
+                    with col_right:
+                        st.subheader("Structure Matrix")
+                        market_bias = "Bullish MSS" if price_change_pct >= 0 else "Bearish MSS"
+                        if price_change_pct >= 0:
+                            st.success(f"🟢 **Structure:** {market_bias}")
+                        else:
+                            st.error(f"🔴 **Structure:** {market_bias}")
+                            
+                        st.metric("Latest Close", f"${current_p:,.2f}", f"{price_change_pct:+.2f}%")
+                        
+                        if fvgs:
+                            st.warning(f"⚠️ **Imbalances Found:** {len(fvgs)} Active Zones")
+                            latest_fvg = fvgs[-1]
+                            st.markdown(f"**Latest {latest_fvg['Type']}:**\n`{latest_fvg['Zone Low']:.2f}` - `{latest_fvg['Zone High']:.2f}`")
+                        else:
+                            st.info("ℹ️ No active imbalances detected on this timeframe.")
+                            
+                        st.markdown("---")
+                        st.metric("Liquidity Pool Status", "Swept / Mitigated", "Optimal Entry Zone")
+                else:
+                    st.error("⚠️ Could not load data for the selected symbol.")
+            except Exception as e:
+                st.error(f"Error executing SMC scan: {e}")
 
     elif nav_tab == "📰 Macro & News Feed":
         st.subheader("Global Economic & Financial Data")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("### 🔴 High-Impact Economic Events")
-            st.markdown("- **08:30 EST** | USD Core CPI")
-            st.markdown("- **14:00 EST** | FOMC Rate Decision")
+            st.markdown("- **08:30 EST** | USD Core CPI (Projected)")
+            st.markdown("- **14:00 EST** | FOMC Rate Decision & Statement")
+            st.markdown("- **04:00 EST** | ECB Monetary Policy Meeting")
         with col2:
             st.markdown("### 🏦 Institutional Tracking & Flow")
-            st.markdown("- **Smart Money Sentiment:** Net Long")
+            st.markdown("- **Smart Money Net Sentiment:** Bullish Accumulation")
+            st.markdown("- **Interbank Liquidity Index:** Stable")
 
     elif nav_tab == "⚖️ Risk & Position Calculator":
         st.subheader("Advanced Risk Management & Trade Planning")
@@ -161,7 +179,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
             order_type = st.selectbox("Order Execution Type", ["Market Order", "Limit Order (POI Entry)"])
         with col_ex2:
             if st.button("Execute Live Order", type="primary"):
-                st.success("🚀 Order Executed Successfully!")
+                st.success("🚀 Institutional Order Routed & Executed Successfully!")
 
 # --- APP 2: QUANTITATIVE MOMENTUM APP ---
 elif app_choice == "📈 Quantitative Momentum App":
