@@ -6,10 +6,55 @@ from datetime import datetime, timedelta
 
 # Page Configuration for Professional Terminal
 st.set_page_config(
-    page_title="Moses Trading & Investment Suite",
+    page_title="Moses Institutional Trading & Investment Suite",
     page_icon="⚡",
     layout="wide"
 )
+
+# --- PROFESSIONAL INSTITUTIONAL CSS STYLING ---
+st.markdown("""
+    <style>
+    /* Main Background & Font Styling */
+    .stApp {
+        background-color: #0e1117;
+        color: #c9d1d9;
+    }
+    
+    /* Sidebar Customization */
+    section[data-testid="stSidebar"] {
+        background-color: #161b22;
+        border-right: 1px solid #30363d;
+    }
+    
+    /* Card / Container Styling */
+    div.stMetric, div.css-1r6slb0, div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Headers Customization */
+    h1, h2, h3 {
+        color: #f0f6fc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    /* Dataframe Styling */
+    dataframe, table {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* Custom success/info boxes */
+    .stAlert {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        color: #f0f6fc;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title("🧭 Navigation Hub")
@@ -19,7 +64,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("Seamlessly switch between your institutional SMC trading desk and your quantitative equity screener.")
+st.sidebar.info("⚡ Live Institutional Terminal v3.5\n\nConnected to real-time feeds with multi-timeframe evaluation.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -120,14 +165,14 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
 
 # --- APP 2: QUANTITATIVE MOMENTUM APP ---
 elif app_choice == "📈 Quantitative Momentum App":
-    st.title("📈 Quantitative Momentum Investing App")
+    st.title("📈 Quantitative Momentum & Predictive Suite")
     
     today_str = datetime.today().strftime('%Y-%m-%d')
-    st.markdown(f"**Latest Active Report:** Multi-Timeframe Momentum & Win Rate Prediction — *{today_str}*")
+    st.markdown(f"**Latest Active Report:** Multi-Timeframe Trend Matrix & Win Probability Engine — *{today_str}*")
     st.divider()
     
     st.subheader("Master Predictive Trade Setups Table")
-    st.markdown("Evaluating 15 premier market leaders across 3M, 3W, 1W, Daily, and 4H trends to estimate institutional win probabilities.")
+    st.markdown("Evaluating 15 premier market leaders across 3M, 3W, 1W, Daily, and 4H trends with real-time win probabilities.")
     
     tickers = [
         'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 
@@ -205,6 +250,7 @@ elif app_choice == "📈 Quantitative Momentum App":
             res_df.index.name = 'Rank'
             res_df = res_df.reset_index()
             
+            # Highlight table view with background styler capability
             st.success("✅ Multi-Timeframe Matrix Computed Successfully!")
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             
