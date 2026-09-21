@@ -9,6 +9,27 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- SMC CALCULATION FUNCTIONS ---
+def detect_fvg(df):
+    """
+    Detects Fair Value Gaps (FVG) in price data.
+    A bullish FVG occurs when Candle 3's Low is higher than Candle 1's High.
+    """
+    fvgs = []
+    for i in range(len(df) - 2):
+        c1_high = df.loc[i, 'High']
+        c3_low = df.loc[i + 2, 'Low']
+        
+        # Bullish FVG
+        if c3_low > c1_high:
+            fvgs.append({
+                'Type': 'Bullish Fvg',
+                'Zone Start': c1_high,
+                'Zone End': c3_low,
+                'Index': i + 1
+            })
+    return fvgs
+
 # Custom Styling & Header
 st.title("🧊 SMC Ice Trading Terminal")
 st.markdown("Institutional Price Action, Smart Money Concepts (SMC), and Execution Engine")
@@ -26,21 +47,35 @@ if nav_tab == "📊 Live Chart & SMC Scanner":
     col_left, col_right = st.columns([3, 1])
     
     with col_left:
-        st.subheader("Price Action Structure (1H / 4H)")
-        st.info("Interactive Candlestick & Liquidity Sweep Module Loading...")
+        st.subheader("Price Action Structure & FVG Overlay")
         
-        # Mock price chart visualization
-        chart_df = pd.DataFrame(
-            np.random.randn(60, 2).cumsum(axis=0) + 100,
-            columns=['Price', 'Institutional Benchmark']
-        )
-        st.line_chart(chart_df)
+        # Generate realistic mock candlestick components
+        np.random.seed(42)
+        price_steps = np.random.randn(60) * 1.5
+        base_price = 4100 + price_steps.cumsum()
+        
+        chart_df = pd.DataFrame({
+            'Price': base_price,
+            'High': base_price + np.random.uniform(0.5, 3.0, 60),
+            'Low': base_price - np.random.uniform(0.5, 3.0, 60)
+        })
+        
+        st.line_chart(chart_df[['Price', 'High', 'Low']])
         
     with col_right:
         st.subheader("Structure Matrix")
         st.success("🟢 **Market Structure:** Bullish MSS Confirmed")
-        st.warning("⚠️ **Active FVG:** 4,120.50 - 4,135.00")
-        st.info("ℹ️ **PO3 Phase:** Manipulation / Expansion")
+        
+        # Run FVG detection function
+        active_fvgs = detect_fvg(chart_df)
+        
+        if active_fvgs:
+            st.warning(f"⚠️ **Detected FVGs:** {len(active_fvgs)} Active Zones")
+            latest_fvg = active_fvgs[-1]
+            st.markdown(f"**Latest FVG Zone:**\n`{latest_fvg['Zone Start']:.2f}` to `{latest_fvg['Zone End']:.2f}`")
+        else:
+            st.info("ℹ️ No active FVG imbalances right now.")
+            
         st.markdown("---")
         st.metric("Liquidity Sweep Status", "Cleaned Equal Highs", "Bullish")
 
