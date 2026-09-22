@@ -58,7 +58,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.4\n\nEquipped with Multi-Timeframe Predictive Momentum Suite.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.5\n\nEquipped with Lightning-Fast Cached Data Engine.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -264,65 +264,67 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
 
 # --- APP 2: QUANTITATIVE MOMENTUM APP ---
 elif app_choice == "📈 Quantitative Momentum App":
-    st.title("📈 Quantitative Momentum & Predictive Suite")
-    st.markdown("Multi-Timeframe Trend Matrix & Win Probability Engine (15 Core Institutional Assets)")
+    st.title("📈 Quantitative Momentum Investing App")
+    
+    # Header report style
+    today_str = datetime.today().strftime('%Y-%m-%d')
+    st.markdown(f"**Latest Active Report:** Quantitative Momentum Report — *{today_str}*")
     st.divider()
     
-    tickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NFLX', 'AMD', 'PLTR', 'QQQ', 'SPY', 'GC=F', 'CL=F', 'BTC-USD']
+    st.subheader("Master Trade Setups Table")
+    st.markdown("Top 15 institutional market leaders ranked by trailing 3-month quantitative momentum with actionable trade parameters.")
     
-    with st.spinner("Evaluating multi-timeframe trends across 3M, 3W, 1W, Daily, and 4H..."):
+    tickers = [
+        'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 
+        'META', 'TSLA', 'NFLX', 'AMD', 'PLTR', 
+        'AVGO', 'JPM', 'XOM', 'COST', 'PEP'
+    ]
+    
+    with st.spinner("Generating master momentum trade setups..."):
         momentum_data = []
         
         for ticker in tickers:
             try:
-                # Fetch multi-timeframe historical slices
-                df_3m = get_cached_data(ticker, "3mo", "1d")
-                df_1w = get_cached_data(ticker, "7d", "1h")
-                df_4h = get_cached_data(ticker, "30d", "60m")
-                
-                if not df_3m.empty and not df_1w.empty:
-                    current_price = float(df_3m['Close'].iloc[-1])
+                df_hist = get_cached_data(ticker, "4mo", "1d")
+                if not df_hist.empty and len(df_hist) > 50:
+                    close_prices = df_hist['Close']
                     
-                    # Calculate percentage changes for horizons
-                    ret_3m = float(((current_price - df_3m['Close'].iloc[0]) / df_3m['Close'].iloc[0]) * 100)
-                    ret_3w = float(((current_price - df_3m['Close'].iloc[-min(21, len(df_3m))]) / df_3m['Close'].iloc[-min(21, len(df_3m))]) * 100)
-                    ret_1w = float(((current_price - df_1w['Close'].iloc[0]) / df_1w['Close'].iloc[0]) * 100)
-                    ret_1d = float(((current_price - df_3m['Close'].iloc[-2]) / df_3m['Close'].iloc[-2]) * 100)
-                    ret_4h = float(((current_price - df_4h['Close'].iloc[-min(6, len(df_4h))]) / df_4h['Close'].iloc[-min(6, len(df_4h))]) * 100)
+                    current_price = float(close_prices.iloc[-1])
+                    price_3m_ago = float(close_prices.iloc[-63] if len(close_prices) >= 63 else close_prices.iloc[0])
+                    ret_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
                     
-                    # Consensus Score & Win Probability Estimation based on alignment
-                    scores = [1 if r > 0 else 0 for r in [ret_3m, ret_3w, ret_1w, ret_1d, ret_4h]]
-                    bull_consensus = sum(scores)
+                    # Actionable trade parameters based on momentum
+                    sentiment = "Strong Bullish" if ret_3m > 10 else ("Bullish" if ret_3m > 0 else "Neutral")
+                    entry = round(current_price, 2)
+                    stop_loss = round(current_price * 0.96, 2)  # 4% risk buffer
+                    target = round(current_price * 1.08, 2)    # 8% upside target
                     
-                    if bull_consensus >= 4:
-                        win_prob = 82.5
-                        sentiment = "🔥 High Conviction Bullish"
-                    elif bull_consensus == 3:
-                        win_prob = 68.0
-                        sentiment = "⚡ Moderate Momentum"
-                    elif bull_consensus <= 1:
-                        win_prob = 80.0 if bull_consensus == 0 else 65.0
-                        sentiment = "🔻 High Conviction Bearish"
-                    else:
-                        win_prob = 52.0
-                        sentiment = "⚠️ Mixed / Consolidation"
-                        
                     momentum_data.append({
-                        'Asset': ticker,
-                        'Price ($)': round(current_price, 2),
-                        '1D Change (%)': round(ret_1d, 2),
-                        '1W Trend (%)': round(ret_1w, 2),
-                        '3W Trend (%)': round(ret_3w, 2),
-                        '3M Trend (%)': round(ret_3m, 2),
-                        'Est. Win Rate (%)': win_prob,
-                        'Signal Sentiment': sentiment
+                        'Ticker': ticker,
+                        '3M Momentum (%)': round(ret_3m, 2),
+                        'Sentiment': sentiment,
+                        'Entry ($)': entry,
+                        'Stop Loss ($)': stop_loss,
+                        'Target ($)': target
                     })
-            except Exception:
+            except Exception as e:
                 continue
-                
+        
         if momentum_data:
             res_df = pd.DataFrame(momentum_data)
+            res_df = res_df.sort_values(by='3M Momentum (%)', ascending=False).reset_index(drop=True)
+            res_df.index = res_df.index + 1  # Rank from 1 to 15
+            res_df.index.name = 'Rank'
+            res_df = res_df.reset_index()
+            
+            st.success("✅ Master Trade Setups Loaded Successfully!")
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             
+            st.markdown("### 3M Momentum Performance Distribution")
+            st.bar_chart(res_df.set_index('Ticker')['3M Momentum (%)'])
+        else:
+            st.error("⚠️ Unable to fetch live data right now. Please check your network connection.")
+            
+
 
 
