@@ -66,7 +66,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.7\n\nEquipped with Styled Financial Tables.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.8\n\nEquipped with Modern Pandas Styler.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -338,7 +338,7 @@ elif app_choice == "📈 Quantitative Momentum App":
                 color = '#26a69a' if val > 0 else '#ef5350'
                 return f'color: {color}; font-weight: bold;'
 
-            styled_df = res_df.style.applymap(
+            styled_df = res_df.style.map(
                 color_momentum, subset=['3M Momentum (%)']
             ).format({
                 '3M Momentum (%)': '{:+.2f}%',
@@ -354,6 +354,7 @@ elif app_choice == "📈 Quantitative Momentum App":
         else:
             st.error("⚠️ Unable to fetch live data right now. Please check your network connection.")
             
+
 
 
 
