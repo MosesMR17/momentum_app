@@ -66,7 +66,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.6\n\nEquipped with Robust Data Engine.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.7\n\nEquipped with Styled Financial Tables.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -288,7 +288,7 @@ elif app_choice == "📈 Quantitative Momentum App":
         'AVGO', 'JPM', 'XOM', 'COST', 'PEP'
     ]
     
-    with st.spinner("Generating master momentum trade setups..."):
+    with st.spinner("Generating professional master momentum trade setups..."):
         momentum_data = []
         
         for ticker in tickers:
@@ -308,7 +308,7 @@ elif app_choice == "📈 Quantitative Momentum App":
                         price_3m_ago = float(close_prices.iloc[lookback_idx])
                         ret_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
                         
-                        sentiment = "Strong Bullish" if ret_3m > 10 else ("Bullish" if ret_3m > 0 else "Neutral")
+                        sentiment = "🔥 Strong Bullish" if ret_3m > 10 else ("🚀 Bullish" if ret_3m > 0 else "⚖️ Neutral")
                         entry = round(current_price, 2)
                         stop_loss = round(current_price * 0.96, 2)
                         target = round(current_price * 1.08, 2)
@@ -332,13 +332,29 @@ elif app_choice == "📈 Quantitative Momentum App":
             res_df = res_df.reset_index()
             
             st.success("✅ Master Trade Setups Loaded Successfully!")
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            
+            # --- PROFESSIONAL TABLE STYLING VIA PANDAS STYLER ---
+            def color_momentum(val):
+                color = '#26a69a' if val > 0 else '#ef5350'
+                return f'color: {color}; font-weight: bold;'
+
+            styled_df = res_df.style.applymap(
+                color_momentum, subset=['3M Momentum (%)']
+            ).format({
+                '3M Momentum (%)': '{:+.2f}%',
+                'Entry ($)': '${:,.2f}',
+                'Stop Loss ($)': '${:,.2f}',
+                'Target ($)': '${:,.2f}'
+            })
+
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
             
             st.markdown("### 3M Momentum Performance Distribution")
             st.bar_chart(res_df.set_index('Ticker')['3M Momentum (%)'])
         else:
             st.error("⚠️ Unable to fetch live data right now. Please check your network connection.")
             
+
 
 
 
