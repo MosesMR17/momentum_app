@@ -42,6 +42,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- CACHED DATA FETCHER FOR LIGHTNING-FAST SPEED ---
+@st.cache_data(ttl=60, show_spinner=False)
+def get_cached_data(ticker, period, interval):
+    df = yf.download(ticker, period=period, interval=interval, progress=False)
+    if not df.empty and isinstance(df.columns, pd.MultiIndex):
+        df = df.xs(ticker, level=1, axis=1)
+    return df
+
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title("🧭 Navigation Hub")
 app_choice = st.sidebar.radio(
@@ -50,7 +58,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.2\n\nEquipped with Professional Multi-Timeframe Suite & Clean Candlesticks.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.3\n\nEquipped with Lightning-Fast Cached Data Engine.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -82,7 +90,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
             smc_ticker = asset_dict[selected_label]
             
         with col_sel2:
-            # Professional Timeframe Selector Mapping to yfinance parameters
             tf_options = {
                 "1 Year (1Y)": {"period": "1y", "interval": "1d"},
                 "6 Months (6M)": {"period": "6mo", "interval": "1d"},
@@ -101,28 +108,23 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
             selected_tf_label = st.selectbox("Professional Timeframe", list(tf_options.keys()))
             fetch_params = tf_options[selected_tf_label]
 
-        with st.spinner(f"Loading {selected_tf_label} data and computing SMC analytics for {selected_label}..."):
+        with st.spinner(f"Computing SMC analytics for {selected_label} ({selected_tf_label})..."):
             try:
-                df_smc = yf.download(smc_ticker, period=fetch_params["period"], interval=fetch_params["interval"], progress=False)
+                df_smc = get_cached_data(smc_ticker, fetch_params["period"], fetch_params["interval"])
+                
                 if not df_smc.empty:
-                    if isinstance(df_smc.columns, pd.MultiIndex):
-                        df_smc = df_smc.xs(smc_ticker, level=1, axis=1)
-                    
                     df_smc = df_smc.dropna()
                     opens = df_smc['Open']
                     highs = df_smc['High']
                     lows = df_smc['Low']
                     closes = df_smc['Close']
                     
-                    # 1. Previous Day High / Low (PDH / PDL)
                     pdh = float(highs.max())
                     pdl = float(lows.min())
                     
-                    # 2. Liquidity Sweeps
                     bsl_swept = any(highs > pdh)
                     ssl_swept = any(lows < pdl)
                     
-                    # 3. Fair Value Gaps (FVG)
                     fvgs = []
                     for i in range(len(df_smc) - 2):
                         c1_high = float(highs.iloc[i])
@@ -135,7 +137,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         elif c3_high < c1_low:
                             fvgs.append({'Type': 'Bearish FVG', 'Low': c3_high, 'High': c1_low})
 
-                    # 4. Order Blocks (OB)
                     bullish_obs, bearish_obs = [], []
                     for i in range(1, len(df_smc) - 1):
                         body_prev = float(closes.iloc[i-1]) - float(opens.iloc[i-1])
@@ -145,7 +146,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                         elif body_prev > 0 and body_curr < 0:
                             bearish_obs.append({'Time': df_smc.index[i-1], 'Low': float(lows.iloc[i-1]), 'High': float(highs.iloc[i-1])})
 
-                    # Structure & PO3 Metrics
                     recent_trend = closes.iloc[-1] - closes.iloc[-min(5, len(closes))]
                     mss_status = "Bullish Structure" if recent_trend >= 0 else "Bearish Structure"
                     
@@ -163,9 +163,7 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                     with col_left:
                         st.subheader(f"{selected_label} — {selected_tf_label} Chart")
                         
-                        # Clean Plotly Candlestick Layout to Prevent Distortion
                         fig = go.Figure()
-
                         fig.add_trace(go.Candlestick(
                             x=df_smc.index,
                             open=opens,
@@ -177,7 +175,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                             name="Candles"
                         ))
                         
-                        # Institutional Reference Lines
                         fig.add_hline(y=pdh, line_dash="dash", line_color="#26a69a", annotation_text="PDH / BSL", annotation_position="top left")
                         fig.add_hline(y=pdl, line_dash="dash", line_color="#ef5350", annotation_text="PDL / SSL", annotation_position="bottom left")
 
@@ -188,7 +185,6 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                             margin=dict(l=20, r=20, t=20, b=20),
                             height=580,
                             xaxis_rangeslider_visible=False,
-                            xaxis=dict(type='category' if 'm' in fetch_params["interval"] or 'h' in fetch_params["interval"] else 'date', dtick=max(1, len(df_smc)//10)),
                             yaxis_title="Price ($)"
                         )
                         st.plotly_chart(fig, use_container_width=True)
@@ -277,14 +273,10 @@ elif app_choice == "📈 Quantitative Momentum App":
     
     for ticker in tickers:
         try:
-            df_hist = yf.download(ticker, period="3mo", interval="1d", progress=False)
+            df_hist = get_cached_data(ticker, "3mo", "1d")
             if not df_hist.empty:
-                if isinstance(df_hist.columns, pd.MultiIndex):
-                    close_daily = df_hist['Close'][ticker]
-                else:
-                    close_daily = df_hist['Close']
-                current_price = float(close_daily.iloc[-1])
-                ret_1d = float(((current_price - close_daily.iloc[-2]) / close_daily.iloc[-2]) * 100)
+                current_price = float(df_hist['Close'].iloc[-1])
+                ret_1d = float(((current_price - df_hist['Close'].iloc[-2]) / df_hist['Close'].iloc[-2]) * 100)
                 momentum_data.append({
                     'Ticker': ticker,
                     'Price ($)': round(current_price, 2),
@@ -298,4 +290,5 @@ elif app_choice == "📈 Quantitative Momentum App":
     if momentum_data:
         st.dataframe(pd.DataFrame(momentum_data), use_container_width=True, hide_index=True)
         
+
 
