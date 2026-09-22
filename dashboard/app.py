@@ -42,12 +42,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CACHED DATA FETCHER FOR LIGHTNING-FAST SPEED ---
+# --- ROBUST CACHED DATA FETCHER ---
 @st.cache_data(ttl=60, show_spinner=False)
 def get_cached_data(ticker, period, interval):
     df = yf.download(ticker, period=period, interval=interval, progress=False)
-    if not df.empty and isinstance(df.columns, pd.MultiIndex):
-        df = df.xs(ticker, level=1, axis=1)
+    if df.empty:
+        return df
+    if isinstance(df.columns, pd.MultiIndex):
+        try:
+            df = df.xs(ticker, level=1, axis=1)
+        except Exception:
+            try:
+                df = df.xs(ticker, level=0, axis=1)
+            except Exception:
+                pass
     return df
 
 # --- SIDEBAR NAVIGATION ---
@@ -58,7 +66,7 @@ app_choice = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.info("⚡ Live Institutional Terminal v5.5\n\nEquipped with Lightning-Fast Cached Data Engine.")
+st.sidebar.info("⚡ Live Institutional Terminal v5.6\n\nEquipped with Robust Data Engine.")
 
 # --- APP 1: SMC ICE TRADING TERMINAL ---
 if app_choice == "🧊 SMC Ice Trading Terminal":
@@ -114,10 +122,10 @@ if app_choice == "🧊 SMC Ice Trading Terminal":
                 
                 if not df_smc.empty:
                     df_smc = df_smc.dropna()
-                    opens = df_smc['Open']
-                    highs = df_smc['High']
-                    lows = df_smc['Low']
-                    closes = df_smc['Close']
+                    opens = df_smc['Open'].squeeze()
+                    highs = df_smc['High'].squeeze()
+                    lows = df_smc['Low'].squeeze()
+                    closes = df_smc['Close'].squeeze()
                     
                     pdh = float(highs.max())
                     pdl = float(lows.min())
@@ -286,34 +294,40 @@ elif app_choice == "📈 Quantitative Momentum App":
         for ticker in tickers:
             try:
                 df_hist = get_cached_data(ticker, "4mo", "1d")
-                if not df_hist.empty and len(df_hist) > 50:
-                    close_prices = df_hist['Close']
+                if not df_hist.empty:
+                    close_col = df_hist['Close']
+                    if isinstance(close_col, pd.DataFrame):
+                        close_prices = close_col.iloc[:, 0]
+                    else:
+                        close_prices = close_col
                     
-                    current_price = float(close_prices.iloc[-1])
-                    price_3m_ago = float(close_prices.iloc[-63] if len(close_prices) >= 63 else close_prices.iloc[0])
-                    ret_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
-                    
-                    # Actionable trade parameters based on momentum
-                    sentiment = "Strong Bullish" if ret_3m > 10 else ("Bullish" if ret_3m > 0 else "Neutral")
-                    entry = round(current_price, 2)
-                    stop_loss = round(current_price * 0.96, 2)  # 4% risk buffer
-                    target = round(current_price * 1.08, 2)    # 8% upside target
-                    
-                    momentum_data.append({
-                        'Ticker': ticker,
-                        '3M Momentum (%)': round(ret_3m, 2),
-                        'Sentiment': sentiment,
-                        'Entry ($)': entry,
-                        'Stop Loss ($)': stop_loss,
-                        'Target ($)': target
-                    })
+                    close_prices = close_prices.dropna()
+                    if len(close_prices) > 20:
+                        current_price = float(close_prices.iloc[-1])
+                        lookback_idx = -63 if len(close_prices) >= 63 else 0
+                        price_3m_ago = float(close_prices.iloc[lookback_idx])
+                        ret_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
+                        
+                        sentiment = "Strong Bullish" if ret_3m > 10 else ("Bullish" if ret_3m > 0 else "Neutral")
+                        entry = round(current_price, 2)
+                        stop_loss = round(current_price * 0.96, 2)
+                        target = round(current_price * 1.08, 2)
+                        
+                        momentum_data.append({
+                            'Ticker': ticker,
+                            '3M Momentum (%)': round(ret_3m, 2),
+                            'Sentiment': sentiment,
+                            'Entry ($)': entry,
+                            'Stop Loss ($)': stop_loss,
+                            'Target ($)': target
+                        })
             except Exception as e:
                 continue
         
         if momentum_data:
             res_df = pd.DataFrame(momentum_data)
             res_df = res_df.sort_values(by='3M Momentum (%)', ascending=False).reset_index(drop=True)
-            res_df.index = res_df.index + 1  # Rank from 1 to 15
+            res_df.index = res_df.index + 1
             res_df.index.name = 'Rank'
             res_df = res_df.reset_index()
             
