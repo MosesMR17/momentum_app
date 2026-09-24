@@ -1,8 +1,12 @@
 import os
+import sys
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import yfinance as yf
+
+# Ensure root directory is in python path for cloud imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from modules.backtest.engine import run_momentum_backtest
 
@@ -15,11 +19,15 @@ st.write("Welcome to your institutional-grade momentum screening and backtesting
 # --- Section 1: Master Trade Setups & Report ---
 st.subheader("📊 Latest Active Report: Quantitative Momentum")
 st.caption("Active Report Date: 2026-09-24")
-st.markdown("Top institutional market leaders ranked by trailing 3-month quantitative momentum with actionable trade parameters.")
+st.markdown("Top 15 institutional market leaders ranked by trailing 3-month quantitative momentum with actionable trade parameters.")
 
 mock_leaders = pd.DataFrame({
     "Ticker": ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD", "AVGO", "JPM", "XOM", "COST", "LLY", "UNH"],
-    "3M Momentum Score": [0.34, 0.52, 0.28, 0.25, 0.31, 0.45, 0.22, 0.29, 0.41, 0.38, 0.15, 0.18, 0.20, 0.33, 0.16],
+    "3M Momentum (%)": ["+34.2%", "+52.8%", "+28.5%", "+25.1%", "+31.4%", "+45.6%", "+22.3%", "+29.8%", "+41.2%", "+38.7%", "+15.4%", "+18.9%", "+20.5%", "+33.1%", "+16.2%"],
+    "Sentiment": ["Bullish", "Very Bullish", "Bullish", "Neutral", "Bullish", "Very Bullish", "Watch", "Bullish", "Very Bullish", "Bullish", "Neutral", "Neutral", "Bullish", "Very Bullish", "Neutral"],
+    "Entry ($)": [225.50, 118.20, 420.00, 175.30, 185.00, 510.40, 240.00, 650.00, 155.80, 1420.50, 195.00, 115.40, 850.20, 920.00, 525.00],
+    "Stop Loss ($)": [214.00, 110.00, 400.00, 168.00, 176.00, 485.00, 225.00, 615.00, 148.00, 1350.00, 188.00, 110.00, 815.00, 880.00, 500.00],
+    "Target ($)": [250.00, 140.00, 460.00, 195.00, 205.00, 570.00, 275.00, 720.00, 175.00, 1580.00, 215.00, 128.00, 920.00, 1020.00, 580.00],
     "Action": ["Buy/Hold", "Strong Momentum", "Hold", "Hold", "Buy/Hold", "Strong Momentum", "Watch", "Hold", "Strong Momentum", "Buy/Hold", "Hold", "Hold", "Hold", "Strong Momentum", "Hold"]
 })
 
