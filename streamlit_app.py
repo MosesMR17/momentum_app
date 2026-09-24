@@ -1,20 +1,27 @@
-import os
-import sys
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import yfinance as yf
-
-# Ensure root directory is in python path for cloud imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from modules.backtest.engine import run_momentum_backtest
 
 # --- Page Config ---
 st.set_page_config(page_title="Quantitative Momentum Dashboard", layout="wide")
 
 st.title("📈 Quantitative Momentum & Backtest Engine")
 st.write("Welcome to your institutional-grade momentum screening and backtesting platform.")
+
+# --- Self-Contained Momentum Backtest Engine ---
+def run_momentum_backtest(prices, lookback_window=20):
+    df = pd.DataFrame(index=prices.index)
+    df['Price'] = prices
+    df['Return'] = df['Price'].pct_change()
+    df['Momentum'] = df['Price'].pct_change(lookback_window)
+    df['Signal'] = 0
+    df.loc[df['Momentum'] > 0, 'Signal'] = 1
+    df['Strategy_Return'] = df['Signal'].shift(1) * df['Return']
+    
+    df['Buy_Hold_Cum'] = (1 + df['Return'].fillna(0)).cumprod()
+    df['Strategy_Cum'] = (1 + df['Strategy_Return'].fillna(0)).cumprod()
+    return df.dropna()
 
 # --- Section 1: Master Trade Setups & Report ---
 st.subheader("📊 Latest Active Report: Quantitative Momentum")
