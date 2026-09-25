@@ -196,8 +196,7 @@ with tab3:
                 fig_seas = px.bar(
                     seas_df, x='Month_Name', y='Return', 
                     title=f"Average Monthly Returns (%) for {season_ticker}",
-                    color='Return', color_continuous_scale='RdYlGn',
-                    render_mode='svg'
+                    color='Return', color_continuous_scale='RdYlGn'
                 )
                 fig_seas.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig_seas, use_container_width=True)
