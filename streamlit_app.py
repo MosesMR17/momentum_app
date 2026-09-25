@@ -18,20 +18,12 @@ st.markdown("""
         color: #ffffff !important;
         border: 1px solid #334155 !important;
     }
-    .metric-card {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid #334155;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("⚡ QUANTITATIVE MOMENTUM & SMC TERMINAL")
 st.markdown("---")
 
-# --- Helper Functions for SMC & Momentum Scanning ---
 @st.cache_data
 def fetch_market_leaders():
     tickers = ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD", "AVGO", "JPM", "XOM", "COST", "LLY", "UNH"]
@@ -53,7 +45,6 @@ def fetch_market_leaders():
                 curr_price = float(close.iloc[-1])
                 mom_3m = float((close.iloc[-1] / close.iloc[-60] - 1) * 100) if len(close) >= 60 else 0.0
                 
-                # SMC Structural Calculations & Order Block Metrics
                 recent_high = float(high.iloc[-20:].max())
                 recent_low = float(low.iloc[-20:].min())
                 bos_status = "BOS Bullish Break" if curr_price >= recent_high * 0.99 else "Mitigation Zone"
@@ -78,20 +69,30 @@ def fetch_market_leaders():
             
     return pd.DataFrame(report_data)
 
-def run_momentum_backtest(prices, lookback_window=20):
+# --- Professional Quantitative Strategy Engine ---
+def run_profitable_momentum_strategy(prices, lookback_window=20, trend_window=50):
     df = pd.DataFrame(index=prices.index)
     df['Price'] = prices
     df['Return'] = df['Price'].pct_change()
+    
+    # 1. Momentum Trigger
     df['Momentum'] = df['Price'].pct_change(lookback_window)
+    
+    # 2. Macro Trend Filter (Simple Moving Average)
+    df['Trend_SMA'] = df['Price'].rolling(window=trend_window).mean()
+    
+    # 3. Dual-Filter Signal Generation (Must be in trend AND have positive momentum)
     df['Signal'] = 0
-    df.loc[df['Momentum'] > 0, 'Signal'] = 1
+    df.loc[(df['Price'] > df['Trend_SMA']) & (df['Momentum'] > 0), 'Signal'] = 1
+    
+    # Strategy returns (lagged by 1 day to prevent lookahead bias)
     df['Strategy_Return'] = df['Signal'].shift(1) * df['Return']
     
     df['Buy_Hold_Cum'] = (1 + df['Return'].fillna(0)).cumprod()
     df['Strategy_Cum'] = (1 + df['Strategy_Return'].fillna(0)).cumprod()
     return df.dropna()
 
-# --- Unified Multi-Tab Layout on One Page ---
+# --- Multi-Tab Layout ---
 tab1, tab2 = st.tabs(["📊 LIVE SMC TERMINAL & SCREENER", "⚙️ QUANTITATIVE BACKTEST ENGINE"])
 
 with tab1:
@@ -115,19 +116,21 @@ with tab1:
         st.error("Unable to load live market data feeds at the moment.")
 
 with tab2:
-    st.subheader("Strategy Simulation & Performance Analytics")
-    st.write("Backtest quantitative momentum strategies against traditional Buy & Hold benchmarks.")
+    st.subheader("Dual-Filter Trend & Momentum Backtest Engine")
+    st.write("Simulates a rules-based quantitative model combining macro trend alignment (SMA filter) with momentum triggers and cash preservation.")
 
-    col_input1, col_input2 = st.columns([2, 2])
+    col_input1, col_input2, col_input3 = st.columns(3)
     with col_input1:
         ticker_input = st.text_input("Target Ticker Symbol", value="NVDA").upper()
     with col_input2:
-        lookback = st.slider("Lookback Window (Days)", min_value=5, max_value=100, value=20)
+        lookback = st.slider("Momentum Window (Days)", min_value=5, max_value=60, value=20)
+    with col_input3:
+        trend_ma = st.slider("Macro Trend Filter (SMA Days)", min_value=20, max_value=200, value=50)
 
-    if st.button("RUN SIMULATION", type="primary"):
-        with st.spinner(f"Simulating quantitative algorithms for {ticker_input}..."):
+    if st.button("RUN QUANTITATIVE SIMULATION", type="primary"):
+        with st.spinner(f"Running multi-factor simulation for {ticker_input}..."):
             try:
-                data = yf.download(ticker_input, period="1y", interval="1d", progress=False)
+                data = yf.download(ticker_input, period="2y", interval="1d", progress=False)
             except Exception:
                 data = pd.DataFrame()
 
@@ -137,13 +140,13 @@ with tab2:
                 else:
                     prices = data['Close']
                     
-                results = run_momentum_backtest(prices, lookback_window=lookback)
+                results = run_profitable_momentum_strategy(prices, lookback_window=lookback, trend_window=trend_ma)
                 
                 fig = px.line(
                     results, 
                     y=['Buy_Hold_Cum', 'Strategy_Cum'],
                     labels={'value': 'Growth of $1', 'index': 'Date', 'variable': 'Strategy'},
-                    title=f"SMC Momentum Strategy vs Buy & Hold ({ticker_input})"
+                    title=f"Dual-Filter Momentum Strategy vs Buy & Hold ({ticker_input})"
                 )
                 fig.update_layout(
                     plot_bgcolor='#0b0f19',
@@ -158,8 +161,8 @@ with tab2:
                 
                 m1, m2 = st.columns(2)
                 with m1:
-                    st.metric("Buy & Hold Benchmark", f"{final_bh:.2%}")
+                    st.metric("Buy & Hold Benchmark Return", f"{final_bh:.2%}")
                 with m2:
-                    st.metric("SMC Strategy Alpha", f"{final_strat:.2%}")
+                    st.metric("Quantitative Strategy Return", f"{final_strat:.2%}")
             else:
                 st.error(f"Could not retrieve ticker data for '{ticker_input}'. Please check symbol validity.")
