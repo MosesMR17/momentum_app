@@ -79,18 +79,15 @@ def fetch_market_leaders():
     return pd.DataFrame(report_data)
 
 def calculate_risk_metrics(returns_series, risk_free_rate=0.0):
-    # Annualized Sharpe Ratio (assuming 252 trading days)
     excess_returns = returns_series - (risk_free_rate / 252)
     volatility = returns_series.std() * np.sqrt(252)
     sharpe = (excess_returns.mean() * 252) / volatility if volatility != 0 else 0.0
     
-    # Maximum Drawdown Calculation
     cum_returns = (1 + returns_series.fillna(0)).cumprod()
     peak = cum_returns.cummax()
     drawdown = (cum_returns - peak) / peak
     max_dd = drawdown.min()
     
-    # Annualized Volatility
     ann_vol = volatility * 100
     
     return sharpe, max_dd * 100, ann_vol
@@ -174,14 +171,14 @@ with tab2:
                 fig.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # Compute Returns & Risk Stats
                 strat_sharpe, strat_mdd, strat_vol = calculate_risk_metrics(results['Strategy_Return'])
                 bh_sharpe, bh_mdd, bh_vol = calculate_risk_metrics(results['Return'])
                 
                 st.markdown("### 📉 Institutional Risk & Performance Analytics")
                 r1, r2, r3, r4 = st.columns(4)
                 r1.metric("Strategy Sharpe Ratio", f"{strat_sharpe:.2f}", delta=f"{strat_sharpe - bh_sharpe:+.2f} vs B&H")
-                r2.metric("Strategy Max Drawdown", f"{strat_mdd:.2f}%", delta=f"{strat_mdd - bh_mdd:+.2f}% vs B&H", delta_inverse=True)
+                # Corrected parameter: delta_color="inverse"
+                r2.metric("Strategy Max Drawdown", f"{strat_mdd:.2f}%", delta=f"{strat_mdd - bh_mdd:+.2f}% vs B&H", delta_color="inverse")
                 r3.metric("Strategy Ann. Volatility", f"{strat_vol:.2f}%")
                 r4.metric("Strategy Total Return", f"{results['Strategy_Cum'].iloc[-1]-1:.2%}")
             else:
