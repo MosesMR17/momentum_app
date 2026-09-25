@@ -26,7 +26,8 @@ st.markdown("---")
 
 @st.cache_data
 def fetch_market_leaders():
-    tickers = ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD", "AVGO", "JPM", "XOM", "COST", "LLY", "UNH"]
+    # Added major indices (^GSPC for S&P 500, ^NDX for Nasdaq 100) alongside key equities
+    tickers = ["^GSPC", "^NDX", "SPY", "QQQ", "AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AMD", "AVGO", "JPM"]
     report_data = []
     
     for t in tickers:
@@ -54,8 +55,13 @@ def fetch_market_leaders():
                 stop_loss = round(recent_low * 0.98, 2)
                 target = round(curr_price * 1.12, 2)
                 
+                # Clean up display names for indices
+                display_name = t
+                if t == "^GSPC": display_name = "S&P 500 Index (^GSPC)"
+                elif t == "^NDX": display_name = "Nasdaq 100 Index (^NDX)"
+                
                 report_data.append({
-                    "Ticker": t,
+                    "Asset": display_name,
                     "3M Momentum (%)": f"{mom_3m:+.1f}%",
                     "SMC Structure": bos_status,
                     "Sentiment": sentiment,
@@ -75,17 +81,12 @@ def run_profitable_momentum_strategy(prices, lookback_window=20, trend_window=50
     df['Price'] = prices
     df['Return'] = df['Price'].pct_change()
     
-    # 1. Momentum Trigger
     df['Momentum'] = df['Price'].pct_change(lookback_window)
-    
-    # 2. Macro Trend Filter (Simple Moving Average)
     df['Trend_SMA'] = df['Price'].rolling(window=trend_window).mean()
     
-    # 3. Dual-Filter Signal Generation (Must be in trend AND have positive momentum)
     df['Signal'] = 0
     df.loc[(df['Price'] > df['Trend_SMA']) & (df['Momentum'] > 0), 'Signal'] = 1
     
-    # Strategy returns (lagged by 1 day to prevent lookahead bias)
     df['Strategy_Return'] = df['Signal'].shift(1) * df['Return']
     
     df['Buy_Hold_Cum'] = (1 + df['Return'].fillna(0)).cumprod()
@@ -96,8 +97,8 @@ def run_profitable_momentum_strategy(prices, lookback_window=20, trend_window=50
 tab1, tab2 = st.tabs(["📊 LIVE SMC TERMINAL & SCREENER", "⚙️ QUANTITATIVE BACKTEST ENGINE"])
 
 with tab1:
-    st.subheader("Institutional Order Block & Liquidity Tracking")
-    st.caption("Real-time market scanning incorporating BOS structural breaks and quantitative momentum ratings.")
+    st.subheader("Institutional Order Block & Index Tracking")
+    st.caption("Real-time market scanning incorporating S&P 500, Nasdaq 100, structural breaks, and momentum ratings.")
 
     with st.spinner("Executing live institutional data stream..."):
         df_leaders = fetch_market_leaders()
@@ -117,11 +118,13 @@ with tab1:
 
 with tab2:
     st.subheader("Dual-Filter Trend & Momentum Backtest Engine")
-    st.write("Simulates a rules-based quantitative model combining macro trend alignment (SMA filter) with momentum triggers and cash preservation.")
+    st.write("Test strategies on individual equities or major benchmarks like the S&P 500 (^GSPC) and Nasdaq 100 (^NDX / QQQ).")
 
     col_input1, col_input2, col_input3 = st.columns(3)
     with col_input1:
-        ticker_input = st.text_input("Target Ticker Symbol", value="NVDA").upper()
+        # Provide quick dropdown / text flexibility for indices
+        ticker_option = st.selectbox("Select Benchmark or Enter Ticker", ["^NDX (Nasdaq 100)", "^GSPC (S&P 500)", "QQQ", "SPY", "NVDA", "AAPL", "MSFT"])
+        ticker_input = ticker_option.split(" ")[0]
     with col_input2:
         lookback = st.slider("Momentum Window (Days)", min_value=5, max_value=60, value=20)
     with col_input3:
@@ -165,4 +168,4 @@ with tab2:
                 with m2:
                     st.metric("Quantitative Strategy Return", f"{final_strat:.2%}")
             else:
-                st.error(f"Could not retrieve ticker data for '{ticker_input}'. Please check symbol validity.")
+                st.error(f"Could not retrieve data for '{ticker_input}'. Please check symbol availability.")
