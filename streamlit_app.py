@@ -167,7 +167,7 @@ with tab2:
                 prices = data['Close'].iloc[:, 0] if isinstance(data.columns, pd.MultiIndex) else data['Close']
                 results = run_profitable_momentum_strategy(prices, lookback_window=lookback, trend_window=trend_ma)
                 
-                fig = px.line(results, y=['Buy_Hold_Cum', 'Strategy_Cum'], title=f"Strategy Performance vs Benchmark ({ticker_input})")
+                fig = px.line(results, y=['Buy_Hold_Cum', 'Strategy_Cum'], title=f"Strategy Performance vs Benchmark ({ticker_input})", render_mode='svg')
                 fig.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig, use_container_width=True)
                 
@@ -177,7 +177,6 @@ with tab2:
                 st.markdown("### 📉 Institutional Risk & Performance Analytics")
                 r1, r2, r3, r4 = st.columns(4)
                 r1.metric("Strategy Sharpe Ratio", f"{strat_sharpe:.2f}", delta=f"{strat_sharpe - bh_sharpe:+.2f} vs B&H")
-                # Corrected parameter: delta_color="inverse"
                 r2.metric("Strategy Max Drawdown", f"{strat_mdd:.2f}%", delta=f"{strat_mdd - bh_mdd:+.2f}% vs B&H", delta_color="inverse")
                 r3.metric("Strategy Ann. Volatility", f"{strat_vol:.2f}%")
                 r4.metric("Strategy Total Return", f"{results['Strategy_Cum'].iloc[-1]-1:.2%}")
@@ -197,7 +196,8 @@ with tab3:
                 fig_seas = px.bar(
                     seas_df, x='Month_Name', y='Return', 
                     title=f"Average Monthly Returns (%) for {season_ticker}",
-                    color='Return', color_continuous_scale='RdYlGn'
+                    color='Return', color_continuous_scale='RdYlGn',
+                    render_mode='svg'
                 )
                 fig_seas.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig_seas, use_container_width=True)
