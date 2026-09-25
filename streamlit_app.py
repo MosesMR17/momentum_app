@@ -53,20 +53,15 @@ def fetch_market_leaders():
                 
                 curr_price = float(close.iloc[-1])
                 prev_price = float(close.iloc[-2])
-                
-                # Daily Progress / Return (%)
                 daily_pct = float((curr_price / prev_price - 1) * 100)
-                
-                # 3-Month Momentum (%)
                 mom_3m = float((close.iloc[-1] / close.iloc[-60] - 1) * 100) if len(close) >= 60 else 0.0
                 
                 recent_high = float(high.iloc[-20:].max())
                 recent_low = float(low.iloc[-20:].min())
                 bos_status = "BOS Bullish Break" if curr_price >= recent_high * 0.99 else "Mitigation Zone"
                 
-                # Intelligent Directional Bias Score
                 bias = "🟢 STRONG BULLISH" if mom_3m > 15 and bos_status == "BOS Bullish Break" else (
-                       "🟡 NEUTRAL / CHOP" if mom_3m >= 0 else "🔴 BEARISH / RISK-OFF")
+                       "�� NEUTRAL / CHOP" if mom_3m >= 0 else "🔴 BEARISH / RISK-OFF")
                 
                 report_data.append({
                     "Asset": t,
@@ -82,6 +77,23 @@ def fetch_market_leaders():
         except Exception:
             continue
     return pd.DataFrame(report_data)
+
+def calculate_risk_metrics(returns_series, risk_free_rate=0.0):
+    # Annualized Sharpe Ratio (assuming 252 trading days)
+    excess_returns = returns_series - (risk_free_rate / 252)
+    volatility = returns_series.std() * np.sqrt(252)
+    sharpe = (excess_returns.mean() * 252) / volatility if volatility != 0 else 0.0
+    
+    # Maximum Drawdown Calculation
+    cum_returns = (1 + returns_series.fillna(0)).cumprod()
+    peak = cum_returns.cummax()
+    drawdown = (cum_returns - peak) / peak
+    max_dd = drawdown.min()
+    
+    # Annualized Volatility
+    ann_vol = volatility * 100
+    
+    return sharpe, max_dd * 100, ann_vol
 
 def run_profitable_momentum_strategy(prices, lookback_window=20, trend_window=50):
     df = pd.DataFrame(index=prices.index)
@@ -102,10 +114,7 @@ def get_seasonal_analysis(ticker):
     try:
         df = yf.download(ticker, period="max", interval="1d", progress=False)
         if df.empty: return None
-        if isinstance(df.columns, pd.MultiIndex):
-            close = df['Close'].iloc[:, 0]
-        else:
-            close = df['Close']
+        close = df['Close'].iloc[:, 0] if isinstance(df.columns, pd.MultiIndex) else df['Close']
             
         temp_df = pd.DataFrame({'Close': close})
         temp_df['Month'] = temp_df.index.month
@@ -120,7 +129,7 @@ def get_seasonal_analysis(ticker):
 # --- Multi-Tab Navigation Structure ---
 tab1, tab2, tab3, tab4 = st.tabs([
     "📊 SMC & Market Screener", 
-    "⚙️ Quantitative Backtest", 
+    "⚙️ Quantitative Backtest & Risk", 
     "📅 Seasonal & Trend Analyzer", 
     "📰 Macro & Fed News Feed"
 ])
@@ -145,7 +154,7 @@ with tab1:
         st.error("Error loading live screener data.")
 
 with tab2:
-    st.subheader("Dual-Filter Trend & Momentum Strategy Engine")
+    st.subheader("Dual-Filter Trend Strategy & Advanced Risk Metrics")
     col1, col2, col3 = st.columns(3)
     with col1:
         ticker_input = st.selectbox("Select Asset / Index", ["^GSPC", "^NDX", "SPY", "QQQ", "NVDA", "AAPL", "MSFT", "AMZN"])
@@ -154,8 +163,8 @@ with tab2:
     with col3:
         trend_ma = st.slider("Macro Trend SMA Filter", 20, 200, 50)
 
-    if st.button("RUN SIMULATION", type="primary"):
-        with st.spinner(f"Simulating quantitative models for {ticker_input}..."):
+    if st.button("RUN QUANTITATIVE SIMULATION", type="primary"):
+        with st.spinner(f"Simulating quantitative models and computing risk metrics for {ticker_input}..."):
             data = yf.download(ticker_input, period="3y", interval="1d", progress=False)
             if not data.empty:
                 prices = data['Close'].iloc[:, 0] if isinstance(data.columns, pd.MultiIndex) else data['Close']
@@ -165,9 +174,16 @@ with tab2:
                 fig.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig, use_container_width=True)
                 
-                m1, m2 = st.columns(2)
-                m1.metric("Buy & Hold Return", f"{results['Buy_Hold_Cum'].iloc[-1]-1:.2%}")
-                m2.metric("Quantitative Strategy Return", f"{results['Strategy_Cum'].iloc[-1]-1:.2%}")
+                # Compute Returns & Risk Stats
+                strat_sharpe, strat_mdd, strat_vol = calculate_risk_metrics(results['Strategy_Return'])
+                bh_sharpe, bh_mdd, bh_vol = calculate_risk_metrics(results['Return'])
+                
+                st.markdown("### 📉 Institutional Risk & Performance Analytics")
+                r1, r2, r3, r4 = st.columns(4)
+                r1.metric("Strategy Sharpe Ratio", f"{strat_sharpe:.2f}", delta=f"{strat_sharpe - bh_sharpe:+.2f} vs B&H")
+                r2.metric("Strategy Max Drawdown", f"{strat_mdd:.2f}%", delta=f"{strat_mdd - bh_mdd:+.2f}% vs B&H", delta_inverse=True)
+                r3.metric("Strategy Ann. Volatility", f"{strat_vol:.2f}%")
+                r4.metric("Strategy Total Return", f"{results['Strategy_Cum'].iloc[-1]-1:.2%}")
             else:
                 st.error("Failed to retrieve price data.")
 
