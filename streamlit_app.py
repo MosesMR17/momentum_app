@@ -3,13 +3,11 @@ import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
-# --- Page Config ---
 st.set_page_config(page_title="Quantitative Momentum & SMC Dashboard", layout="wide")
 
 st.title("📈 Quantitative Momentum & Institutional SMC Engine")
 st.write("Advanced screening, Smart Money Concepts (SMC) structure tracking, and quantitative backtesting.")
 
-# --- Helper Functions for SMC & Momentum Scanning ---
 @st.cache_data
 def fetch_market_leaders():
     tickers = ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD", "AVGO", "JPM", "XOM", "COST", "LLY", "UNH"]
@@ -31,7 +29,6 @@ def fetch_market_leaders():
                 curr_price = float(close.iloc[-1])
                 mom_3m = float((close.iloc[-1] / close.iloc[-60] - 1) * 100) if len(close) >= 60 else 0.0
                 
-                # SMC Structural Calculations (Order Block & BOS Simulation)
                 recent_high = float(high.iloc[-20:].max())
                 recent_low = float(low.iloc[-20:].min())
                 bos_status = "BOS Bullish Break" if curr_price >= recent_high * 0.99 else "Mitigation Zone"
@@ -69,7 +66,6 @@ def run_momentum_backtest(prices, lookback_window=20):
     df['Strategy_Cum'] = (1 + df['Strategy_Return'].fillna(0)).cumprod()
     return df.dropna()
 
-# --- Section 1: Institutional Screener & SMC Report ---
 st.subheader("📊 Live Institutional Screener & SMC Analysis")
 st.caption("Real-time market screening incorporating Smart Money Concepts (BOS, Order Blocks, Liquidity targets).")
 
@@ -83,7 +79,6 @@ else:
 
 st.markdown("---")
 
-# --- Section 2: Strategy Backtest Engine ---
 st.subheader("⚙️ Quantitative Backtest Engine")
 st.write("Backtest momentum strategies against Buy & Hold using live historical data feeds.")
 
