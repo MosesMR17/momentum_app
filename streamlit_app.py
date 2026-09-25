@@ -4,10 +4,32 @@ import streamlit as st
 import yfinance as yf
 
 # --- Page Config ---
-st.set_page_config(page_title="Quantitative Momentum & SMC Dashboard", layout="wide")
+st.set_page_config(page_title="Quantitative Momentum & SMC Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-st.title("📈 Quantitative Momentum & Institutional SMC Engine")
-st.write("Advanced screening, Smart Money Concepts (SMC) structure tracking, and quantitative backtesting in a unified view.")
+# --- High-Tech Terminal CSS Styling ---
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0b0f19;
+        color: #e2e8f0;
+    }
+    .stTextInput input, .stSlider {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 1px solid #334155 !important;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid #334155;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("⚡ QUANTITATIVE MOMENTUM & SMC TERMINAL")
+st.markdown("---")
 
 # --- Helper Functions for SMC & Momentum Scanning ---
 @st.cache_data
@@ -70,41 +92,40 @@ def run_momentum_backtest(prices, lookback_window=20):
     return df.dropna()
 
 # --- Unified Multi-Tab Layout on One Page ---
-tab1, tab2 = st.tabs(["📊 Live SMC Trading & Screener", "⚙️ Quantitative Backtest Engine"])
+tab1, tab2 = st.tabs(["📊 LIVE SMC TERMINAL & SCREENER", "⚙️ QUANTITATIVE BACKTEST ENGINE"])
 
 with tab1:
-    st.subheader("Institutional Screener & Smart Money Concepts (SMC) Analysis")
-    st.caption("Real-time market scanning incorporating BOS, Order Blocks, and Liquidity target metrics.")
+    st.subheader("Institutional Order Block & Liquidity Tracking")
+    st.caption("Real-time market scanning incorporating BOS structural breaks and quantitative momentum ratings.")
 
-    with st.spinner("Analyzing live market data and institutional order blocks..."):
+    with st.spinner("Executing live institutional data stream..."):
         df_leaders = fetch_market_leaders()
 
     if not df_leaders.empty:
         def highlight_table(row):
-            styles = [''] * len(row)
             if row['Sentiment'] == 'Very Bullish':
-                return ['background-color: rgba(40, 167, 69, 0.15)'] * len(row)
+                return ['background-color: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: bold;'] * len(row)
             elif row['Sentiment'] == 'Bullish':
-                return ['background-color: rgba(23, 162, 184, 0.1)'] * len(row)
-            return styles
+                return ['background-color: rgba(59, 130, 246, 0.15); color: #60a5fa;'] * len(row)
+            return ['color: #cbd5e1;'] * len(row)
 
         styled_df = df_leaders.style.apply(highlight_table, axis=1)
         st.dataframe(styled_df, use_container_width=True)
     else:
-        st.error("Unable to load live market data tables at the moment.")
+        st.error("Unable to load live market data feeds at the moment.")
 
 with tab2:
-    st.subheader("Quantitative Backtest Engine")
-    st.write("Backtest momentum strategies against Buy & Hold using live historical data feeds.")
+    st.subheader("Strategy Simulation & Performance Analytics")
+    st.write("Backtest quantitative momentum strategies against traditional Buy & Hold benchmarks.")
 
     col_input1, col_input2 = st.columns([2, 2])
     with col_input1:
-        ticker_input = st.text_input("Enter Ticker for Backtest", value="NVDA").upper()
+        ticker_input = st.text_input("Target Ticker Symbol", value="NVDA").upper()
     with col_input2:
-        lookback = st.slider("Momentum Lookback Window (Days)", min_value=5, max_value=100, value=20)
+        lookback = st.slider("Lookback Window (Days)", min_value=5, max_value=100, value=20)
 
-    if st.button("Run Backtest", type="primary"):
-        with st.spinner(f"Fetching data and simulating strategy for {ticker_input}..."):
+    if st.button("RUN SIMULATION", type="primary"):
+        with st.spinner(f"Simulating quantitative algorithms for {ticker_input}..."):
             try:
                 data = yf.download(ticker_input, period="1y", interval="1d", progress=False)
             except Exception:
@@ -124,14 +145,21 @@ with tab2:
                     labels={'value': 'Growth of $1', 'index': 'Date', 'variable': 'Strategy'},
                     title=f"SMC Momentum Strategy vs Buy & Hold ({ticker_input})"
                 )
-                fig.update_layout(legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1})
+                fig.update_layout(
+                    plot_bgcolor='#0b0f19',
+                    paper_bgcolor='#0b0f19',
+                    font_color='#e2e8f0',
+                    legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}
+                )
                 st.plotly_chart(fig, use_container_width=True)
                 
                 final_bh = results['Buy_Hold_Cum'].iloc[-1] - 1
                 final_strat = results['Strategy_Cum'].iloc[-1] - 1
                 
                 m1, m2 = st.columns(2)
-                m1.metric("Buy & Hold Return", f"{final_bh:.2%}")
-                m2.metric("SMC Strategy Return", f"{final_strat:.2%}")
+                with m1:
+                    st.metric("Buy & Hold Benchmark", f"{final_bh:.2%}")
+                with m2:
+                    st.metric("SMC Strategy Alpha", f"{final_strat:.2%}")
             else:
-                st.error(f"Could not retrieve data for '{ticker_input}'. Please check the ticker symbol.")
+                st.error(f"Could not retrieve ticker data for '{ticker_input}'. Please check symbol validity.")
