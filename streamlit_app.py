@@ -3,11 +3,13 @@ import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
+# --- Page Config ---
 st.set_page_config(page_title="Quantitative Momentum & SMC Dashboard", layout="wide")
 
 st.title("📈 Quantitative Momentum & Institutional SMC Engine")
-st.write("Advanced screening, Smart Money Concepts (SMC) structure tracking, and quantitative backtesting.")
+st.write("Advanced screening, Smart Money Concepts (SMC) structure tracking, and quantitative backtesting in a unified view.")
 
+# --- Helper Functions for SMC & Momentum Scanning ---
 @st.cache_data
 def fetch_market_leaders():
     tickers = ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD", "AVGO", "JPM", "XOM", "COST", "LLY", "UNH"]
@@ -29,6 +31,7 @@ def fetch_market_leaders():
                 curr_price = float(close.iloc[-1])
                 mom_3m = float((close.iloc[-1] / close.iloc[-60] - 1) * 100) if len(close) >= 60 else 0.0
                 
+                # SMC Structural Calculations & Order Block Metrics
                 recent_high = float(high.iloc[-20:].max())
                 recent_low = float(low.iloc[-20:].min())
                 bos_status = "BOS Bullish Break" if curr_price >= recent_high * 0.99 else "Mitigation Zone"
@@ -66,57 +69,60 @@ def run_momentum_backtest(prices, lookback_window=20):
     df['Strategy_Cum'] = (1 + df['Strategy_Return'].fillna(0)).cumprod()
     return df.dropna()
 
-st.subheader("📊 Live Institutional Screener & SMC Analysis")
-st.caption("Real-time market screening incorporating Smart Money Concepts (BOS, Order Blocks, Liquidity targets).")
+# --- Unified Multi-Tab Layout on One Page ---
+tab1, tab2 = st.tabs(["📊 Live SMC Trading & Screener", "⚙️ Quantitative Backtest Engine"])
 
-with st.spinner("Analyzing live market data and institutional order blocks..."):
-    df_leaders = fetch_market_leaders()
+with tab1:
+    st.subheader("Institutional Screener & Smart Money Concepts (SMC) Analysis")
+    st.caption("Real-time market scanning incorporating BOS, Order Blocks, and Liquidity target metrics.")
 
-if not df_leaders.empty:
-    st.dataframe(df_leaders, use_container_width=True)
-else:
-    st.error("Unable to load live market data tables at the moment.")
+    with st.spinner("Analyzing live market data and institutional order blocks..."):
+        df_leaders = fetch_market_leaders()
 
-st.markdown("---")
+    if not df_leaders.empty:
+        st.dataframe(df_leaders, use_container_width=True)
+    else:
+        st.error("Unable to load live market data tables at the moment.")
 
-st.subheader("⚙️ Quantitative Backtest Engine")
-st.write("Backtest momentum strategies against Buy & Hold using live historical data feeds.")
+with tab2:
+    st.subheader("Quantitative Backtest Engine")
+    st.write("Backtest momentum strategies against Buy & Hold using live historical data feeds.")
 
-col_input1, col_input2 = st.columns([2, 2])
-with col_input1:
-    ticker_input = st.text_input("Enter Ticker for Backtest", value="NVDA").upper()
-with col_input2:
-    lookback = st.slider("Momentum Lookback Window (Days)", min_value=5, max_value=100, value=20)
+    col_input1, col_input2 = st.columns([2, 2])
+    with col_input1:
+        ticker_input = st.text_input("Enter Ticker for Backtest", value="NVDA").upper()
+    with col_input2:
+        lookback = st.slider("Momentum Lookback Window (Days)", min_value=5, max_value=100, value=20)
 
-if st.button("Run Backtest", type="primary"):
-    with st.spinner(f"Fetching data and simulating strategy for {ticker_input}..."):
-        try:
-            data = yf.download(ticker_input, period="1y", interval="1d", progress=False)
-        except Exception:
-            data = pd.DataFrame()
+    if st.button("Run Backtest", type="primary"):
+        with st.spinner(f"Fetching data and simulating strategy for {ticker_input}..."):
+            try:
+                data = yf.download(ticker_input, period="1y", interval="1d", progress=False)
+            except Exception:
+                data = pd.DataFrame()
 
-        if not data.empty:
-            if isinstance(data.columns, pd.MultiIndex):
-                prices = data['Close'].iloc[:, 0]
-            else:
-                prices = data['Close']
+            if not data.empty:
+                if isinstance(data.columns, pd.MultiIndex):
+                    prices = data['Close'].iloc[:, 0]
+                else:
+                    prices = data['Close']
+                    
+                results = run_momentum_backtest(prices, lookback_window=lookback)
                 
-            results = run_momentum_backtest(prices, lookback_window=lookback)
-            
-            fig = px.line(
-                results, 
-                y=['Buy_Hold_Cum', 'Strategy_Cum'],
-                labels={'value': 'Growth of $1', 'index': 'Date', 'variable': 'Strategy'},
-                title=f"SMC Momentum Strategy vs Buy & Hold ({ticker_input})"
-            )
-            fig.update_layout(legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1})
-            st.plotly_chart(fig, use_container_width=True)
-            
-            final_bh = results['Buy_Hold_Cum'].iloc[-1] - 1
-            final_strat = results['Strategy_Cum'].iloc[-1] - 1
-            
-            m1, m2 = st.columns(2)
-            m1.metric("Buy & Hold Return", f"{final_bh:.2%}")
-            m2.metric("SMC Strategy Return", f"{final_strat:.2%}")
-        else:
-            st.error(f"Could not retrieve data for '{ticker_input}'. Please check the ticker symbol.")
+                fig = px.line(
+                    results, 
+                    y=['Buy_Hold_Cum', 'Strategy_Cum'],
+                    labels={'value': 'Growth of $1', 'index': 'Date', 'variable': 'Strategy'},
+                    title=f"SMC Momentum Strategy vs Buy & Hold ({ticker_input})"
+                )
+                fig.update_layout(legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1})
+                st.plotly_chart(fig, use_container_width=True)
+                
+                final_bh = results['Buy_Hold_Cum'].iloc[-1] - 1
+                final_strat = results['Strategy_Cum'].iloc[-1] - 1
+                
+                m1, m2 = st.columns(2)
+                m1.metric("Buy & Hold Return", f"{final_bh:.2%}")
+                m2.metric("SMC Strategy Return", f"{final_strat:.2%}")
+            else:
+                st.error(f"Could not retrieve data for '{ticker_input}'. Please check the ticker symbol.")
