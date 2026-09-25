@@ -1,10 +1,11 @@
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
 # --- Page Config ---
-st.set_page_config(page_title="Quantitative Momentum & SMC Dashboard", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Quantitative Momentum & SMC Terminal", layout="wide", initial_sidebar_state="expanded")
 
 # --- High-Tech Terminal CSS Styling ---
 st.markdown("""
@@ -13,21 +14,28 @@ st.markdown("""
         background-color: #0b0f19;
         color: #e2e8f0;
     }
-    .stTextInput input, .stSlider {
+    .stTextInput input, .stSlider, .stSelectbox {
         background-color: #1e293b !important;
         color: #ffffff !important;
         border: 1px solid #334155 !important;
     }
+    .card-box {
+        background: #111827;
+        border: 1px solid #1f2937;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ QUANTITATIVE MOMENTUM & SMC TERMINAL")
+st.title("⚡ QUANTITATIVE MOMENTUM & SMC INTELLIGENCE TERMINAL")
 st.markdown("---")
 
+# --- Helper Functions for Data & Analysis ---
 @st.cache_data
 def fetch_market_leaders():
-    # Added major indices (^GSPC for S&P 500, ^NDX for Nasdaq 100) alongside key equities
-    tickers = ["^GSPC", "^NDX", "SPY", "QQQ", "AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AMD", "AVGO", "JPM"]
+    tickers = ["^GSPC", "^NDX", "SPY", "QQQ", "AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AMD"]
     report_data = []
     
     for t in tickers:
@@ -50,122 +58,156 @@ def fetch_market_leaders():
                 recent_low = float(low.iloc[-20:].min())
                 bos_status = "BOS Bullish Break" if curr_price >= recent_high * 0.99 else "Mitigation Zone"
                 
-                sentiment = "Very Bullish" if mom_3m > 30 else ("Bullish" if mom_3m > 10 else "Neutral")
-                entry = round(curr_price, 2)
-                stop_loss = round(recent_low * 0.98, 2)
-                target = round(curr_price * 1.12, 2)
-                
-                # Clean up display names for indices
-                display_name = t
-                if t == "^GSPC": display_name = "S&P 500 Index (^GSPC)"
-                elif t == "^NDX": display_name = "Nasdaq 100 Index (^NDX)"
+                # Intelligent Directional Bias Score
+                bias = "🟢 STRONG BULLISH" if mom_3m > 15 and bos_status == "BOS Bullish Break" else (
+                       "🟡 NEUTRAL / CHOP" if mom_3m >= 0 else "🔴 BEARISH / RISK-OFF")
                 
                 report_data.append({
-                    "Asset": display_name,
-                    "3M Momentum (%)": f"{mom_3m:+.1f}%",
+                    "Asset": t,
+                    "Price ($)": round(curr_price, 2),
+                    "3M Momentum": f"{mom_3m:+.1f}%",
                     "SMC Structure": bos_status,
-                    "Sentiment": sentiment,
-                    "Entry ($)": entry,
-                    "Stop Loss ($)": stop_loss,
-                    "Target ($)": target,
-                    "Action": "Strong Momentum" if mom_3m > 25 else "Hold / Accumulate"
+                    "Directional Bias": bias,
+                    "Entry Trigger": round(curr_price, 2),
+                    "Stop Loss": round(recent_low * 0.98, 2),
+                    "Target": round(curr_price * 1.10, 2)
                 })
         except Exception:
             continue
-            
     return pd.DataFrame(report_data)
 
-# --- Professional Quantitative Strategy Engine ---
 def run_profitable_momentum_strategy(prices, lookback_window=20, trend_window=50):
     df = pd.DataFrame(index=prices.index)
     df['Price'] = prices
     df['Return'] = df['Price'].pct_change()
-    
     df['Momentum'] = df['Price'].pct_change(lookback_window)
     df['Trend_SMA'] = df['Price'].rolling(window=trend_window).mean()
     
     df['Signal'] = 0
     df.loc[(df['Price'] > df['Trend_SMA']) & (df['Momentum'] > 0), 'Signal'] = 1
-    
     df['Strategy_Return'] = df['Signal'].shift(1) * df['Return']
     
     df['Buy_Hold_Cum'] = (1 + df['Return'].fillna(0)).cumprod()
     df['Strategy_Cum'] = (1 + df['Strategy_Return'].fillna(0)).cumprod()
     return df.dropna()
 
-# --- Multi-Tab Layout ---
-tab1, tab2 = st.tabs(["📊 LIVE SMC TERMINAL & SCREENER", "⚙️ QUANTITATIVE BACKTEST ENGINE"])
+def get_seasonal_analysis(ticker):
+    try:
+        df = yf.download(ticker, period="max", interval="1d", progress=False)
+        if df.empty: return None
+        if isinstance(df.columns, pd.MultiIndex):
+            close = df['Close'].iloc[:, 0]
+        else:
+            close = df['Close']
+            
+        temp_df = pd.DataFrame({'Close': close})
+        temp_df['Month'] = temp_df.index.month
+        temp_df['Return'] = temp_df['Close'].pct_change() * 100
+        monthly_avg = temp_df.groupby('Month')['Return'].mean().reset_index()
+        month_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+        monthly_avg['Month_Name'] = monthly_avg['Month'].map(month_names)
+        return monthly_avg
+    except Exception:
+        return None
+
+# --- Multi-Tab Navigation Structure ---
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 SMC & Market Screener", 
+    "⚙️ Quantitative Backtest", 
+    "📅 Seasonal & Trend Analyzer", 
+    "📰 Macro & Fed News Feed"
+])
 
 with tab1:
     st.subheader("Institutional Order Block & Index Tracking")
-    st.caption("Real-time market scanning incorporating S&P 500, Nasdaq 100, structural breaks, and momentum ratings.")
+    st.caption("Real-time scanning featuring structural breaks (BOS) and predictive directional bias.")
 
-    with st.spinner("Executing live institutional data stream..."):
+    with st.spinner("Streaming institutional data..."):
         df_leaders = fetch_market_leaders()
 
     if not df_leaders.empty:
-        def highlight_table(row):
-            if row['Sentiment'] == 'Very Bullish':
-                return ['background-color: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: bold;'] * len(row)
-            elif row['Sentiment'] == 'Bullish':
-                return ['background-color: rgba(59, 130, 246, 0.15); color: #60a5fa;'] * len(row)
+        def style_rows(row):
+            if "STRONG BULLISH" in row['Directional Bias']:
+                return ['background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold;'] * len(row)
+            elif "BEARISH" in row['Directional Bias']:
+                return ['background-color: rgba(239, 68, 68, 0.15); color: #f87171;'] * len(row)
             return ['color: #cbd5e1;'] * len(row)
 
-        styled_df = df_leaders.style.apply(highlight_table, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(df_leaders.style.apply(style_rows, axis=1), use_container_width=True)
     else:
-        st.error("Unable to load live market data feeds at the moment.")
+        st.error("Error loading live screener data.")
 
 with tab2:
-    st.subheader("Dual-Filter Trend & Momentum Backtest Engine")
-    st.write("Test strategies on individual equities or major benchmarks like the S&P 500 (^GSPC) and Nasdaq 100 (^NDX / QQQ).")
+    st.subheader("Dual-Filter Trend & Momentum Strategy Engine")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        ticker_input = st.selectbox("Select Asset / Index", ["^GSPC", "^NDX", "SPY", "QQQ", "NVDA", "AAPL", "MSFT", "AMZN"])
+    with col2:
+        lookback = st.slider("Momentum Window (Days)", 5, 60, 20)
+    with col3:
+        trend_ma = st.slider("Macro Trend SMA Filter", 20, 200, 50)
 
-    col_input1, col_input2, col_input3 = st.columns(3)
-    with col_input1:
-        # Provide quick dropdown / text flexibility for indices
-        ticker_option = st.selectbox("Select Benchmark or Enter Ticker", ["^NDX (Nasdaq 100)", "^GSPC (S&P 500)", "QQQ", "SPY", "NVDA", "AAPL", "MSFT"])
-        ticker_input = ticker_option.split(" ")[0]
-    with col_input2:
-        lookback = st.slider("Momentum Window (Days)", min_value=5, max_value=60, value=20)
-    with col_input3:
-        trend_ma = st.slider("Macro Trend Filter (SMA Days)", min_value=20, max_value=200, value=50)
-
-    if st.button("RUN QUANTITATIVE SIMULATION", type="primary"):
-        with st.spinner(f"Running multi-factor simulation for {ticker_input}..."):
-            try:
-                data = yf.download(ticker_input, period="2y", interval="1d", progress=False)
-            except Exception:
-                data = pd.DataFrame()
-
+    if st.button("RUN SIMULATION", type="primary"):
+        with st.spinner(f"Simulating quantitative models for {ticker_input}..."):
+            data = yf.download(ticker_input, period="3y", interval="1d", progress=False)
             if not data.empty:
-                if isinstance(data.columns, pd.MultiIndex):
-                    prices = data['Close'].iloc[:, 0]
-                else:
-                    prices = data['Close']
-                    
+                prices = data['Close'].iloc[:, 0] if isinstance(data.columns, pd.MultiIndex) else data['Close']
                 results = run_profitable_momentum_strategy(prices, lookback_window=lookback, trend_window=trend_ma)
                 
-                fig = px.line(
-                    results, 
-                    y=['Buy_Hold_Cum', 'Strategy_Cum'],
-                    labels={'value': 'Growth of $1', 'index': 'Date', 'variable': 'Strategy'},
-                    title=f"Dual-Filter Momentum Strategy vs Buy & Hold ({ticker_input})"
-                )
-                fig.update_layout(
-                    plot_bgcolor='#0b0f19',
-                    paper_bgcolor='#0b0f19',
-                    font_color='#e2e8f0',
-                    legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1}
-                )
+                fig = px.line(results, y=['Buy_Hold_Cum', 'Strategy_Cum'], title=f"Strategy Performance vs Benchmark ({ticker_input})")
+                fig.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
                 st.plotly_chart(fig, use_container_width=True)
                 
-                final_bh = results['Buy_Hold_Cum'].iloc[-1] - 1
-                final_strat = results['Strategy_Cum'].iloc[-1] - 1
-                
                 m1, m2 = st.columns(2)
-                with m1:
-                    st.metric("Buy & Hold Benchmark Return", f"{final_bh:.2%}")
-                with m2:
-                    st.metric("Quantitative Strategy Return", f"{final_strat:.2%}")
+                m1.metric("Buy & Hold Return", f"{results['Buy_Hold_Cum'].iloc[-1]-1:.2%}")
+                m2.metric("Quantitative Strategy Return", f"{results['Strategy_Cum'].iloc[-1]-1:.2%}")
             else:
-                st.error(f"Could not retrieve data for '{ticker_input}'. Please check symbol availability.")
+                st.error("Failed to retrieve price data.")
+
+with tab3:
+    st.subheader("Seasonal Momentum & Historical Month-by-Month Analyzer")
+    st.write("Examine historical performance seasonality to detect statistically favorable months for specific assets.")
+    
+    season_ticker = st.selectbox("Choose Asset for Seasonality Check", ["^GSPC", "^NDX", "SPY", "QQQ", "NVDA", "AAPL"], key="season_box")
+    
+    if st.button("Analyze Seasonality"):
+        with st.spinner("Extracting multi-year historical seasonal trends..."):
+            seas_df = get_seasonal_analysis(season_ticker)
+            if seas_df is not None and not seas_df.empty:
+                fig_seas = px.bar(
+                    seas_df, x='Month_Name', y='Return', 
+                    title=f"Average Monthly Returns (%) for {season_ticker}",
+                    color='Return', color_continuous_scale='RdYlGn'
+                )
+                fig_seas.update_layout(plot_bgcolor='#0b0f19', paper_bgcolor='#0b0f19', font_color='#e2e8f0')
+                st.plotly_chart(fig_seas, use_container_width=True)
+            else:
+                st.warning("Insufficient historical data for seasonal breakdown.")
+
+with tab4:
+    st.subheader("Live Macro, Central Bank & Fed News Stream")
+    st.write("Real-time sentiment feed tracking major macroeconomic and Federal Reserve catalysts.")
+    
+    # Live News Feed via yfinance Ticker API
+    news_ticker = st.selectbox("Select News Channel / Asset Focus", ["^GSPC", "^NDX", "SPY", "QQQ", "USD=X"], key="news_box")
+    try:
+        t_obj = yf.Ticker(news_ticker)
+        news_items = t_obj.news
+        if news_items:
+            for item in news_items[:8]:
+                # Handle dictionary formats safely across different yfinance updates
+                content = item.get('content', item)
+                title = content.get('title', 'No Title Available')
+                publisher = content.get('publisher', 'Financial Wire')
+                link = content.get('link', '#')
+                
+                st.markdown(f"""
+                <div class="card-box">
+                    <p style="color: #60a5fa; font-size: 12px; margin-bottom: 4px;">SOURCE: {publisher.upper()}</p>
+                    <a href="{link}" target="_blank" style="color: #f3f4f6; font-size: 16px; text-decoration: none; font-weight: 600;">{title}</a>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No recent news articles returned from feed.")
+    except Exception as e:
+        st.info("Live news stream temporarily restricted by upstream feed limits.")
