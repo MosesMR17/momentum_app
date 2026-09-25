@@ -52,6 +52,12 @@ def fetch_market_leaders():
                     low = df['Low']
                 
                 curr_price = float(close.iloc[-1])
+                prev_price = float(close.iloc[-2])
+                
+                # Daily Progress / Return (%)
+                daily_pct = float((curr_price / prev_price - 1) * 100)
+                
+                # 3-Month Momentum (%)
                 mom_3m = float((close.iloc[-1] / close.iloc[-60] - 1) * 100) if len(close) >= 60 else 0.0
                 
                 recent_high = float(high.iloc[-20:].max())
@@ -65,6 +71,7 @@ def fetch_market_leaders():
                 report_data.append({
                     "Asset": t,
                     "Price ($)": round(curr_price, 2),
+                    "Daily Progress": f"{daily_pct:+.2f}%",
                     "3M Momentum": f"{mom_3m:+.1f}%",
                     "SMC Structure": bos_status,
                     "Directional Bias": bias,
@@ -120,7 +127,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 with tab1:
     st.subheader("Institutional Order Block & Index Tracking")
-    st.caption("Real-time scanning featuring structural breaks (BOS) and predictive directional bias.")
+    st.caption("Real-time scanning featuring daily performance tracking, structural breaks (BOS), and predictive directional bias.")
 
     with st.spinner("Streaming institutional data..."):
         df_leaders = fetch_market_leaders()
@@ -188,14 +195,12 @@ with tab4:
     st.subheader("Live Macro, Central Bank & Fed News Stream")
     st.write("Real-time sentiment feed tracking major macroeconomic and Federal Reserve catalysts.")
     
-    # Live News Feed via yfinance Ticker API
     news_ticker = st.selectbox("Select News Channel / Asset Focus", ["^GSPC", "^NDX", "SPY", "QQQ", "USD=X"], key="news_box")
     try:
         t_obj = yf.Ticker(news_ticker)
         news_items = t_obj.news
         if news_items:
             for item in news_items[:8]:
-                # Handle dictionary formats safely across different yfinance updates
                 content = item.get('content', item)
                 title = content.get('title', 'No Title Available')
                 publisher = content.get('publisher', 'Financial Wire')
